@@ -327,7 +327,7 @@ buildableAttributes_t bg_buildableList[ ] =
     HOVEL_CREEPSIZE,       //int       creepSize;
     qfalse,                //qboolean  dccTest;
     qfalse,                //qboolean  transparentTest;
-    qtrue,                 //qboolean  reactorTest;
+    qfalse,                 //qboolean  reactorTest;
     qfalse,                //qboolean  replacable;
   },
   {

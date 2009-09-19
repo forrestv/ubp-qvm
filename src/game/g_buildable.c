@@ -358,6 +358,44 @@ static qboolean G_FindOvermind( gentity_t *self )
   return qfalse;
 }
 
+static int G_FindHovel( gentity_t *self )
+{
+  int       i;
+  gentity_t *ent;
+
+  int count = 0;
+  //iterate through entities
+  for( i = 1, ent = g_entities + i; i < level.num_entities; i++, ent++ )
+  {
+    if( ent->s.eType != ET_BUILDABLE )
+      continue;
+    if( ent == self)
+      continue;
+    if( ent->s.modelindex == BA_A_HOVEL && ent->spawned && ent->health > 0 )
+    {
+      count++;
+    }
+  }
+  // choose a random one
+  if (count == 0) return 0;
+  count = rand() % count;
+  
+  // return its index
+  for( i = 1, ent = g_entities + i; i < level.num_entities; i++, ent++ )
+  {
+    if( ent->s.eType != ET_BUILDABLE )
+      continue;
+    if( ent == self)
+      continue;
+    if( ent->s.modelindex == BA_A_HOVEL && ent->spawned && ent->health > 0 )
+    {
+      if (count == 0) return i;
+      count--;
+    }
+  }
+}
+
+
 /*
 ================
 G_IsOvermindBuilt
@@ -1301,52 +1339,62 @@ Called when an alien uses a hovel
 void AHovel_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 {
   vec3_t  hovelOrigin, hovelAngles, inverseNormal;
+      gentity_t *otherh;
 
   if( self->spawned && G_FindOvermind( self ) )
   {
-    if( self->active )
+    /* if( self->active )
     {
       //this hovel is in use
       G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_OCCUPIED );
     }
-    else if( ( ( activator->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0 ) ||
-               ( activator->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0_UPG ) ) &&
+    else */ if( 
+//    ( ( activator->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0 ) ||
+//               ( activator->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0_UPG ) ) &&
              activator->health > 0 && self->health > 0 )
     {
-      if( AHovel_Blocked( self, activator, qfalse ) )
+      int other_index = G_FindHovel(self);
+      if (!other_index)
+      {
+        //using same error
+        G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_BLOCKED );
+        return;
+      }
+      otherh = g_entities + other_index;
+      if( AHovel_Blocked( otherh, activator, qfalse ) )
       {
         //you can get in, but you can't get out
         G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_BLOCKED );
         return;
       }
 
-      self->active = qtrue;
+      //self->active = qtrue;
       G_SetBuildableAnim( self, BANIM_ATTACK1, qfalse );
+      G_SetBuildableAnim( otherh, BANIM_ATTACK1, qfalse );
+  if( 1 )
+  {
+    gentity_t *builder = activator;
+    vec3_t    newOrigin;
+    vec3_t    newAngles;
 
-      //prevent lerping
-      activator->client->ps.eFlags ^= EF_TELEPORT_BIT;
-      activator->client->ps.eFlags |= EF_NODRAW;
-      G_UnlaggedClear( activator );
+//    VectorCopy( otherh->s.angles, newAngles );
+//    newAngles[ ROLL ] = 0;
 
-      activator->client->ps.stats[ STAT_STATE ] |= SS_HOVELING;
-      activator->client->hovel = self;
-      self->builder = activator;
-      
-      // Cancel pending suicides
-      activator->suicideTime = 0;
+//    VectorCopy( otherh->s.origin, newOrigin );
+//    VectorMA( newOrigin, 1.0f, otherh->s.origin2, newOrigin );
 
-      VectorCopy( self->s.pos.trBase, hovelOrigin );
-      VectorMA( hovelOrigin, 128.0f, self->s.origin2, hovelOrigin );
+    //prevent lerping
+    builder->client->ps.eFlags ^= EF_TELEPORT_BIT;
+    builder->client->ps.eFlags &= ~EF_NODRAW;
+    G_UnlaggedClear( builder );
+AHovel_Blocked( otherh, activator, qtrue );
+//    G_SetOrigin( builder, newOrigin );
+//    VectorCopy( newOrigin, builder->client->ps.origin );
+//    G_SetClientViewAngle( builder, newAngles );
 
-      VectorCopy( self->s.origin2, inverseNormal );
-      VectorInverse( inverseNormal );
-      vectoangles( inverseNormal, hovelAngles );
-
-      VectorCopy( activator->s.pos.trBase, activator->client->hovelOrigin );
-
-      G_SetOrigin( activator, hovelOrigin );
-      VectorCopy( hovelOrigin, activator->client->ps.origin );
-      G_SetClientViewAngle( activator, hovelAngles );
+    //client leaves hovel
+    //builder->client->ps.stats[ STAT_STATE ] &= ~SS_HOVELING;
+  }
     }
   }
 }
