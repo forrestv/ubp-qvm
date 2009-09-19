@@ -1,0 +1,75 @@
+Index: src/game/g_client.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_client.c,v
+retrieving revision 1.1.1.1.4.4
+diff -u -p -r1.1.1.1.4.4 g_client.c
+--- src/game/g_client.c	17 Feb 2009 13:50:26 -0000	1.1.1.1.4.4
++++ src/game/g_client.c	17 Feb 2009 14:21:55 -0000
+@@ -1817,6 +1817,15 @@ void ClientSpawn( gentity_t *ent, gentit
+ 
+   client->ps.stats[ STAT_STAMINA ] = MAX_STAMINA;
+ 
++  //free credits
++  if( g_freeCredits.integer && ent != spawn )
++  {
++    if( client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
++      client->ps.persistant[ PERS_CREDIT ] = ALIEN_MAX_KILLS;
++    else if( client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
++      client->ps.persistant[ PERS_CREDIT ] = HUMAN_MAX_CREDITS;
++  }
++
+   G_SetOrigin( ent, spawn_origin );
+   VectorCopy( spawn_origin, client->ps.origin );
+ 
+Index: src/game/g_local.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_local.h,v
+retrieving revision 1.1.1.1.4.15
+diff -u -p -r1.1.1.1.4.15 g_local.h
+--- src/game/g_local.h	17 Feb 2009 14:21:02 -0000	1.1.1.1.4.15
++++ src/game/g_local.h	17 Feb 2009 14:21:55 -0000
+@@ -1429,6 +1429,7 @@ extern  vmCvar_t  g_mapvoteMaxTime;
+ 
+ extern  vmCvar_t  g_practiceText;
+ extern  vmCvar_t  g_practiceCount;
++extern  vmCvar_t  g_freeCredits;
+ 
+ extern  vmCvar_t  g_msg;
+ extern  vmCvar_t  g_msgTime;
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.17
+diff -u -p -r1.1.1.1.4.17 g_main.c
+--- src/game/g_main.c	17 Feb 2009 14:21:02 -0000	1.1.1.1.4.17
++++ src/game/g_main.c	17 Feb 2009 14:21:55 -0000
+@@ -213,6 +213,7 @@ vmCvar_t  g_mapvoteMaxTime;
+ 
+ vmCvar_t  g_practiceText;
+ vmCvar_t  g_practiceCount;
++vmCvar_t  g_freeCredits;
+ 
+ vmCvar_t  g_msg;
+ vmCvar_t  g_msgTime;
+@@ -319,6 +320,7 @@ static cvarTable_t   gameCvarTable[ ] =
+ 
+   { &g_practiceText, "g_practiceText", "", 0, 0, qfalse},
+   { &g_practiceCount, "g_practiceCount", "0", 0, 0, qfalse},
++  { &g_freeCredits, "g_freeCredits", "0", CVAR_ARCHIVE, 0, qfalse  },
+   
+   { &g_listEntity, "g_listEntity", "0", 0, 0, qfalse },
+   { &g_minCommandPeriod, "g_minCommandPeriod", "500", 0, 0, qfalse},
+@@ -801,6 +803,13 @@ void G_InitGame( int levelTime, int rand
+     trap_Cvar_Set( "g_practiceCount", va( "%d", g_practiceCount.integer - 1 ) );
+   }
+ 
++  // free credits expiration
++  if( g_freeCredits.integer > 1 )
++  {
++    trap_Cvar_Set( "g_freeCredits",
++      va( "%d", ( g_freeCredits.integer > 2 ) ? g_freeCredits.integer - 1 : 0 ) );
++  }
++
+   // general initialization
+   G_FindTeams( );
+ 

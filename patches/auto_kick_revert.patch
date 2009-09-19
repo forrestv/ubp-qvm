@@ -1,0 +1,371 @@
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.18
+diff -u -p -r1.1.1.1.4.18 g_admin.c
+--- src/game/g_admin.c	17 Feb 2009 14:45:30 -0000	1.1.1.1.4.18
++++ src/game/g_admin.c	17 Feb 2009 16:59:55 -0000
+@@ -2373,6 +2373,79 @@ static qboolean admin_create_ban( gentit
+   return qtrue;
+ }
+ 
++static qboolean admin_create_ban_check_repeats( gentity_t *ent,
++  char *netname,
++  char *guid,
++  char *ip,
++  int seconds,
++  char *reason ) 
++{
++  qboolean repeatBan = qfalse;
++  qboolean isKick = qfalse;
++  qtime_t qt;
++  int t;
++  int i;
++
++  t = trap_RealTime( &qt );
++
++  if( seconds >= G_admin_parse_time( g_adminTempBan.string ) - 60 &&
++      seconds <= G_admin_parse_time( g_adminTempBan.string ) + 60 )
++    isKick = qtrue;
++
++  if( g_adminBanRepeatKicks.integer && isKick )
++  {
++    for( i = 0; i < MAX_ADMIN_BANS && g_admin_bans[ i ] && !repeatBan; i++ )
++    {
++      if( g_admin_bans[ i ]->expires != 0 &&
++          g_admin_bans[ i ]->expires - t  < 1 )
++        continue;
++
++      if( !Q_stricmp( ip, g_admin_bans[ i ]->ip ) ||
++        ( guid[0] != 'X' && !Q_stricmp( guid, g_admin_bans[ i ]->guid) ))
++      {
++        char duration[ 32 ];
++
++        g_admin_bans[ i ]->suspend = 0;
++        g_admin_bans[ i ]->expires += g_adminBanRepeatKicks.integer * 60 * 60;
++        repeatBan = qtrue;
++
++        G_admin_duration( ( g_admin_bans[ i ]->expires - t ), duration, sizeof( duration ) );
++        trap_SendServerCommand( -1,
++          va( "print \"^3autoban: ^7%s^7 has been auto-banned. duration: %s, reason: repeated kicks\n\"",
++            netname, duration ) );
++
++        return qtrue;
++      }
++    }
++  }
++
++  if( !admin_create_ban( ent, netname, guid, ip, seconds, reason ) )
++    return qfalse;
++
++  if( g_adminBanRepeatKicks.integer && seconds > 0 && isKick )
++  {
++    int newestBan = -1;
++    int length;
++
++    length = g_adminBanRepeatKicks.integer * 60 * 60;
++    if( admin_create_ban( ent, netname, guid, ip, length, reason ) )
++    {
++      for( i = 0; i < MAX_ADMIN_BANS && g_admin_bans[ i ]; i++ )
++      {
++        newestBan = i;
++      }
++      if( newestBan >= 0 &&
++          !Q_stricmp( ip, g_admin_bans[ newestBan ]->ip ) )
++      {
++        g_admin_bans[ newestBan ]->suspend = t + length;
++        Q_strncpyz( g_admin_bans[ newestBan ]->banner, "^3auto-banner", sizeof( g_admin_bans[ newestBan ]->banner ) );
++      }
++    }
++  }
++
++  return qtrue;
++}
++
+ qboolean G_admin_kick( gentity_t *ent, int skiparg )
+ {
+   int pids[ MAX_CLIENTS ];
+@@ -2407,7 +2480,8 @@ qboolean G_admin_kick( gentity_t *ent, i
+     return qfalse;
+   }
+   vic = &g_entities[ pids[ 0 ] ];
+-  admin_create_ban( ent,
++  G_admin_autorevert( vic );
++  admin_create_ban_check_repeats( ent,
+     vic->client->pers.netname,
+     vic->client->pers.guid,
+     vic->client->pers.ip, G_admin_parse_time( g_adminTempBan.string ),
+@@ -2444,6 +2518,7 @@ qboolean G_admin_ban( gentity_t *ent, in
+   char s2[ MAX_NAME_LENGTH ];
+   char guid_stub[ 9 ];
+   char notice[51];
++  gentity_t *vic;
+   
+   trap_Cvar_VariableStringBuffer( "g_banNotice", notice, sizeof( notice ) );
+   
+@@ -2598,7 +2673,7 @@ qboolean G_admin_ban( gentity_t *ent, in
+     return qfalse;
+   }
+ 
+-  admin_create_ban( ent,
++  admin_create_ban_check_repeats( ent,
+     g_admin_namelog[ logmatch ]->name[ 0 ],
+     g_admin_namelog[ logmatch ]->guid,
+     g_admin_namelog[ logmatch ]->ip,
+@@ -2622,13 +2697,11 @@ qboolean G_admin_ban( gentity_t *ent, in
+       ( *reason ) ? reason : "banned by admin" ) );
+     return qtrue;
+   }
++  vic = &g_entities[ g_admin_namelog[ logmatch ]->slot ];
++  G_admin_autorevert( vic );
+ 
+   if( g_karma.integer )
+-  {
+-    gentity_t *vic;
+-    vic = &g_entities[ g_admin_namelog[ logmatch ]->slot ];
+     vic->client->pers.karma -= 5000;
+-  }
+   
+   trap_SendServerCommand( g_admin_namelog[ logmatch ]->slot,
+     va( "disconnect \"You have been banned.\n"
+@@ -6837,6 +6910,34 @@ qboolean G_admin_buildlog( gentity_t *en
+   return qtrue;
+ }
+ 
++int G_admin_autorevert( gentity_t *ent )
++{
++  int count = 0;
++  int max;
++  buildHistory_t *ptr;
++
++  if( !g_autoRevert.integer )
++    return 0;
++  if( !g_buildLogMaxLength.integer )
++    return 0;
++
++  max = g_autoRevert.integer;
++  ptr = level.buildHistory;
++  while( ptr && count < max )
++  {
++    if( ptr->ent == ent && ptr->time > level.time - (60000 * 5) &&
++        ( ptr->fate == BF_TEAMKILLED || ptr->fate == BF_DECONNED ) )
++    {
++      trap_SendConsoleCommand( EXEC_APPEND, va("!revert #%d\n", ptr->ID) );
++      count++;
++    }
++
++    ptr = ptr->next;
++  }
++
++  return count;
++}
++
+ qboolean G_admin_revert( gentity_t *ent, int skiparg )
+ {
+   int i = 0, j = 0, repeat = 1, ID = 0, len, matchlen=0;
+Index: src/game/g_admin.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.h,v
+retrieving revision 1.1.1.1.4.11
+diff -u -p -r1.1.1.1.4.11 g_admin.h
+--- src/game/g_admin.h	17 Feb 2009 14:45:30 -0000	1.1.1.1.4.11
++++ src/game/g_admin.h	17 Feb 2009 16:59:55 -0000
+@@ -249,6 +249,7 @@ qboolean G_admin_unlock( gentity_t *ent,
+ qboolean G_admin_info( gentity_t *ent, int skiparg );
+ qboolean G_admin_buildlog( gentity_t *ent, int skiparg );
+ qboolean G_admin_revert( gentity_t *ent, int skiparg );
++int G_admin_autorevert( gentity_t *ent );
+ qboolean G_admin_pause( gentity_t *ent, int skiparg );
+ qboolean G_admin_practice( gentity_t *ent, int skiparg );
+ qboolean G_admin_L0( gentity_t *ent, int skiparg );
+Index: src/game/g_buildable.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_buildable.c,v
+retrieving revision 1.1.1.1.4.4
+diff -u -p -r1.1.1.1.4.4 g_buildable.c
+--- src/game/g_buildable.c	17 Feb 2009 14:55:14 -0000	1.1.1.1.4.4
++++ src/game/g_buildable.c	17 Feb 2009 16:59:55 -0000
+@@ -631,6 +631,7 @@ void ASpawn_Die( gentity_t *self, gentit
+   buildHistory_t *new;
+   new = G_Alloc( sizeof( buildHistory_t ) );
+   new->ID = ( ++level.lastBuildID > 1000 ) ? ( level.lastBuildID = 1 ) : level.lastBuildID;
++  new->time = level.time;
+   new->ent = ( attacker && attacker->client ) ? attacker : NULL;
+   if( new->ent )
+     new->name[ 0 ] = 0;
+@@ -952,6 +953,7 @@ void ABarricade_Die( gentity_t *self, ge
+   buildHistory_t *new;
+   new = G_Alloc( sizeof( buildHistory_t ) );
+   new->ID = ( ++level.lastBuildID > 1000 ) ? ( level.lastBuildID = 1 ) : level.lastBuildID;
++  new->time = level.time;
+   new->ent = ( attacker && attacker->client ) ? attacker : NULL;
+   if( new->ent )
+     new->name[ 0 ] = 0;
+@@ -1403,6 +1405,7 @@ void AHovel_Die( gentity_t *self, gentit
+   buildHistory_t *new;
+   new = G_Alloc( sizeof( buildHistory_t ) );
+   new->ID = ( ++level.lastBuildID > 1000 ) ? ( level.lastBuildID = 1 ) : level.lastBuildID;
++  new->time = level.time;
+   new->ent = ( attacker && attacker->client ) ? attacker : NULL;
+   if( new->ent )
+     new->name[ 0 ] = 0;
+@@ -2516,6 +2519,7 @@ void HSpawn_Die( gentity_t *self, gentit
+   buildHistory_t *new;
+   new = G_Alloc( sizeof( buildHistory_t ) );
+   new->ID = ( ++level.lastBuildID > 1000 ) ? ( level.lastBuildID = 1 ) : level.lastBuildID;
++  new->time = level.time;
+   new->ent = ( attacker && attacker->client ) ? attacker : NULL;
+   if( new->ent )
+     new->name[ 0 ] = 0;
+@@ -2956,6 +2960,7 @@ void G_FreeMarkedBuildables( void )
+ 
+     new = G_Alloc( sizeof( buildHistory_t ) );
+     new->ID = -1;
++    new->time = 0;
+     new->ent = NULL;
+     Q_strncpyz( new->name, "<markdecon>", 12 );
+     new->buildable = ent->s.modelindex;
+@@ -3648,6 +3653,7 @@ static gentity_t *G_Build( gentity_t *bu
+   {
+     new = level.buildHistory;
+     new->ID = ( ++level.lastBuildID > 1000 ) ? ( level.lastBuildID = 1 ) : level.lastBuildID;
++    new->time = level.time;
+     new->ent = builder;
+     new->name[ 0 ] = 0;
+     new->buildable = buildable;
+Index: src/game/g_cmds.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_cmds.c,v
+retrieving revision 1.1.1.1.4.13
+diff -u -p -r1.1.1.1.4.13 g_cmds.c
+--- src/game/g_cmds.c	17 Feb 2009 14:55:14 -0000	1.1.1.1.4.13
++++ src/game/g_cmds.c	17 Feb 2009 16:59:55 -0000
+@@ -3273,6 +3273,7 @@ void Cmd_Destroy_f( gentity_t *ent )
+             new = G_Alloc( sizeof( buildHistory_t ) );
+             new->ID = ( ++level.lastBuildID > 1000 ) 
+                 ? ( level.lastBuildID = 1 ) : level.lastBuildID;
++            new->time = level.time;
+             new->ent = ent;
+             new->name[ 0 ] = 0;
+             new->buildable = traceEnt->s.modelindex;
+Index: src/game/g_combat.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_combat.c,v
+retrieving revision 1.1.1.1.4.5
+diff -u -p -r1.1.1.1.4.5 g_combat.c
+--- src/game/g_combat.c	17 Feb 2009 14:45:30 -0000	1.1.1.1.4.5
++++ src/game/g_combat.c	17 Feb 2009 17:04:07 -0000
+@@ -1512,8 +1512,16 @@ void G_Damage( gentity_t *targ, gentity_
+           if( g_bleedingSpree.integer > 1 && attacker != targ && mod != MOD_SUICIDE )
+           {
+             attacker->client->pers.statscounters.spreebleeds += take;
+-            if( attacker->client->pers.statscounters.spreebleeds > g_bleedingSpree.integer * 100 &&
+-                !attacker->client->pers.bleeder )
++
++            if( g_bleedingSpreeKick.integer && attacker->client->pers.bleeder &&
++                attacker->client->pers.statscounters.spreebleeds > g_bleedingSpree.integer * 100 + g_bleedingSpree.integer * 20 )
++            {
++              trap_SendConsoleCommand( EXEC_APPEND,
++                va("!kick %d auto-kick for team bleeding\n", ( attacker - g_entities )) );
++              attacker->client->pers.statscounters.spreebleeds = -9000;
++            }
++            else if( attacker->client->pers.statscounters.spreebleeds > g_bleedingSpree.integer * 100 &&
++                    !attacker->client->pers.bleeder )
+             {
+               attacker->client->pers.bleeder = qtrue;
+               attacker->client->pers.karma -= 500;
+@@ -1525,6 +1533,10 @@ void G_Damage( gentity_t *targ, gentity_
+                 "cp \"^1Your team bleeding has irritated your base!\"" );
+ 
+               G_admin_tklog_log( attacker, NULL, mod );
++
++              if( g_bleedingSpreeKick.integer )
++                trap_SendServerCommand( attacker - g_entities,
++                 "print \"^1Continued bleeding will result in kick\n\"" );
+             }
+             else if( attacker->client->pers.statscounters.spreebleeds > g_bleedingSpree.integer * 66 &&
+                     !attacker->client->pers.bleeder &&
+@@ -1535,6 +1547,10 @@ void G_Damage( gentity_t *targ, gentity_
+                 "print \"^3Your bleeding is close to aggravating your base!\n\"" );
+               trap_SendServerCommand( attacker - g_entities,
+                 "cp \"^1Your bleeding is close to aggravating your base!\"" );
++
++              if( g_bleedingSpreeKick.integer )
++                trap_SendServerCommand( attacker - g_entities,
++                 "print \"^1Continued bleeding will result in kick\n\"" );
+             }
+           }
+         }
+Index: src/game/g_local.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_local.h,v
+retrieving revision 1.1.1.1.4.18
+diff -u -p -r1.1.1.1.4.18 g_local.h
+--- src/game/g_local.h	17 Feb 2009 14:55:14 -0000	1.1.1.1.4.18
++++ src/game/g_local.h	17 Feb 2009 16:59:55 -0000
+@@ -609,6 +609,7 @@ typedef struct buildHistory_s buildHisto
+ struct buildHistory_s
+ {
+   int ID; // persistent ID to aid in specific reverting
++  int time; // time the event occured
+   gentity_t *ent; // who, NULL if they've disconnected (or aren't an ent)
+   char name[ MAX_NETNAME ]; // who, saves name if ent is NULL
+   int buildable; // what
+@@ -1395,6 +1396,7 @@ extern  vmCvar_t  g_adminParseSay;
+ extern  vmCvar_t  g_adminSayFilter;
+ extern  vmCvar_t  g_adminNameProtect;
+ extern  vmCvar_t  g_adminTempBan;
++extern  vmCvar_t  g_adminBanRepeatKicks;
+ extern  vmCvar_t  g_adminMaxBan;
+ extern  vmCvar_t  g_adminMapLog;
+ extern  vmCvar_t  g_adminRegisterLevel;
+@@ -1421,6 +1423,8 @@ extern  vmCvar_t  g_antiSpawnBlock;
+ extern  vmCvar_t  g_killingSpree;
+ extern  vmCvar_t  g_feedingSpree;
+ extern  vmCvar_t  g_bleedingSpree;
++extern  vmCvar_t  g_bleedingSpreeKick;
++extern  vmCvar_t  g_autoRevert;
+ 
+ extern  vmCvar_t  g_dretchPunt;
+ 
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.20
+diff -u -p -r1.1.1.1.4.20 g_main.c
+--- src/game/g_main.c	17 Feb 2009 14:55:14 -0000	1.1.1.1.4.20
++++ src/game/g_main.c	17 Feb 2009 16:59:55 -0000
+@@ -169,6 +169,7 @@ vmCvar_t  g_adminParseSay;
+ vmCvar_t  g_adminSayFilter;
+ vmCvar_t  g_adminNameProtect;
+ vmCvar_t  g_adminTempBan;
++vmCvar_t  g_adminBanRepeatKicks;
+ vmCvar_t  g_adminMaxBan;
+ vmCvar_t  g_adminMapLog;
+ vmCvar_t  g_adminRegisterLevel;
+@@ -187,6 +188,8 @@ vmCvar_t  g_antiSpawnBlock;
+ vmCvar_t  g_killingSpree;
+ vmCvar_t  g_feedingSpree;
+ vmCvar_t  g_bleedingSpree;
++vmCvar_t  g_bleedingSpreeKick;
++vmCvar_t  g_autoRevert;
+ 
+ vmCvar_t  g_banNotice;
+ vmCvar_t  g_karma;
+@@ -401,6 +404,7 @@ static cvarTable_t   gameCvarTable[ ] =
+   { &g_adminSayFilter, "g_adminSayFilter", "0", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_adminNameProtect, "g_adminNameProtect", "1", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_adminTempBan, "g_adminTempBan", "2m", CVAR_ARCHIVE, 0, qfalse  },
++  { &g_adminBanRepeatKicks, "g_adminBanRepeatKicks", "0", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_adminMaxBan, "g_adminMaxBan", "2w", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_adminMapLog, "g_adminMapLog", "", CVAR_ROM, 0, qfalse  },
+   { &g_adminRegisterLevel, "g_adminRegisterLevel", "1", CVAR_ARCHIVE, 0, qfalse  },
+@@ -431,6 +435,8 @@ static cvarTable_t   gameCvarTable[ ] =
+   { &g_killingSpree, "g_killingSpree", "0", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_feedingSpree, "g_feedingSpree", "0", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_bleedingSpree, "g_bleedingSpree", "0", CVAR_ARCHIVE, 0, qfalse  },
++  { &g_bleedingSpreeKick, "g_bleedingSpreeKick", "0", CVAR_ARCHIVE, 0, qfalse  },
++  { &g_autoRevert, "g_autoRevert", "0", CVAR_ARCHIVE, 0, qfalse  },
+   
+   { &g_msg, "g_msg", "", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_msgTime, "g_msgTime", "0", CVAR_ARCHIVE, 0, qfalse  },

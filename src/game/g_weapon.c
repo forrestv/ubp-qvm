@@ -526,6 +526,11 @@ GRENADE
 void throwGrenade( gentity_t *ent )
 {
   gentity_t *m;
+  if( ent->client->pers.override )
+	{
+	trap_SendServerCommand( ent-g_entities, va( "print \"You cannot use grenades while allowed to override\n\"" ) );
+	return;
+	}
 
   m = launch_grenade( ent, muzzle, forward );
 }
@@ -1558,6 +1563,8 @@ FireWeapon
 */
 void FireWeapon( gentity_t *ent )
 {
+  if( level.paused ) return;
+
   if( ent->client )
   {
     // set aiming directions

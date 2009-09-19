@@ -1,0 +1,95 @@
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.29
+diff -u -p -r1.1.1.1.4.29 g_admin.c
+--- src/game/g_admin.c	1 Mar 2009 01:19:46 -0000	1.1.1.1.4.29
++++ src/game/g_admin.c	1 Mar 2009 01:51:34 -0000
+@@ -1508,6 +1508,7 @@ qboolean G_admin_ban_check( char *userin
+   int t;
+   char notice[51];
+   qboolean ignoreIP = qfalse;
++  qboolean banned = qfalse;
+   
+   trap_Cvar_VariableStringBuffer( "g_banNotice", notice, sizeof( notice ) );
+  
+@@ -1578,46 +1579,38 @@ qboolean G_admin_ban_check( char *userin
+ 
+       if( intIP == tempIP || mask == 0 )
+       {
+-        char duration[ 32 ];
+-        G_admin_duration( ( g_admin_bans[ i ]->expires - t ),
+-          duration, sizeof( duration ) );
+-
+-        // flood protected
+-        if( t - lastConnectTime >= 300 ||
+-            Q_stricmp( lastConnectIP, ip ) )
+-        {
+-          lastConnectTime = t;
+-          Q_strncpyz( lastConnectIP, ip, sizeof( lastConnectIP ) );
+-
+-          G_AdminsPrintf(
+-            "Banned player %s^7 (%s^7) tried to connect (ban #%i on %s by %s^7 expires %s reason: %s^7 )\n",
+-            Info_ValueForKey( userinfo, "name" ),
+-            g_admin_bans[ i ]->name,
+-            i+1,
+-            ip, 
+-            g_admin_bans[ i ]->banner,
+-            duration,
+-            g_admin_bans[ i ]->reason );
+-        }
+-            
+-        Com_sprintf(
+-          reason,
+-          rlen,
+-          "You have been banned by %s^7 reason: %s^7 expires: %s       %s",
+-          g_admin_bans[ i ]->banner,
+-          g_admin_bans[ i ]->reason,
+-          duration,
+-          notice
+-          );
+         G_LogPrintf("Banned player tried to connect from IP %s\n", ip);
+-        return qtrue;
++        banned = qtrue;
+       }
+     }
+-    if( *guid && !Q_stricmp( g_admin_bans[ i ]->guid, guid ) )
++    if( !banned && *guid && !Q_stricmp( g_admin_bans[ i ]->guid, guid ) )
++    {
++      G_LogPrintf("Banned player tried to connect with GUID %s\n", guid);
++      banned = qtrue;
++    }
++    if( banned )
+     {
+       char duration[ 32 ];
+       G_admin_duration( ( g_admin_bans[ i ]->expires - t ),
+         duration, sizeof( duration ) );
++
++      // flood protected
++      if( t - lastConnectTime >= 300 ||
++          Q_stricmp( lastConnectIP, ip ) )
++      {
++        lastConnectTime = t;
++        Q_strncpyz( lastConnectIP, ip, sizeof( lastConnectIP ) );
++
++        G_AdminsPrintf(
++          "Banned player %s^7 (%s^7) tried to connect (ban #%i on %s by %s^7 expires %s reason: %s^7 )\n",
++          Info_ValueForKey( userinfo, "name" ),
++          g_admin_bans[ i ]->name,
++          i+1,
++          ip, 
++          g_admin_bans[ i ]->banner,
++          duration,
++          g_admin_bans[ i ]->reason );
++      }
+       Com_sprintf(
+         reason,
+         rlen,
+@@ -1626,7 +1619,6 @@ qboolean G_admin_ban_check( char *userin
+         g_admin_bans[ i ]->reason,
+         duration
+       );
+-      G_Printf("Banned player tried to connect with GUID %s\n", guid);
+       return qtrue;
+     }
+   }

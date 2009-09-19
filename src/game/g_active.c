@@ -852,8 +852,18 @@ void ClientTimerActions( gentity_t *ent, int msec )
       }
 
       if( ent->health > 0 && ent->health < client->ps.stats[ STAT_MAX_HEALTH ] &&
+          !level.paused &&
           ( ent->lastDamageTime + ALIEN_REGEN_DAMAGE_TIME ) < level.time )
+      {
         ent->health += BG_FindRegenRateForClass( client->ps.stats[ STAT_PCLASS ] ) * modifier;
+
+        // if completely healed, cancel retribution
+        if( ent->health >= client->ps.stats[ STAT_MAX_HEALTH ] )
+        {
+          for( i = 0; i < MAX_CLIENTS; i++ )
+            ent->client->tkcredits[ i ] = 0;
+        }
+      }
 
       if( ent->health > client->ps.stats[ STAT_MAX_HEALTH ] )
         ent->health = client->ps.stats[ STAT_MAX_HEALTH ];
@@ -1375,6 +1385,7 @@ void ClientThink_real( gentity_t *ent )
   int       oldEventSequence;
   int       msec;
   usercmd_t *ucmd;
+  int       real_pm_type;
 
   client = ent->client;
 
@@ -1384,6 +1395,9 @@ void ClientThink_real( gentity_t *ent )
 
   // mark the time, so the connection sprite can be removed
   ucmd = &ent->client->pers.cmd;
+
+  if( client->pers.paused )
+    ucmd->forwardmove = ucmd->rightmove = ucmd->upmove = ucmd->buttons = 0;
 
   // sanity check the command time to prevent speedup cheating
   if( ucmd->serverTime > level.time + 200 )
@@ -1478,6 +1492,10 @@ void ClientThink_real( gentity_t *ent )
   else
     client->ps.pm_type = PM_NORMAL;
 
+  // paused
+  real_pm_type = client->ps.pm_type;
+  if ( level.paused ) client->ps.pm_type = PM_SPECTATOR;
+
   if( client->ps.stats[ STAT_STATE ] & SS_GRABBED &&
       client->grabExpiryTime < level.time )
     client->ps.stats[ STAT_STATE ] &= ~SS_GRABBED;
@@ -1506,6 +1524,15 @@ void ClientThink_real( gentity_t *ent )
 
   client->ps.gravity = g_gravity.value;
 
+  if( client->pers.bubbleTime && client->pers.bubbleTime < level.time )
+  {
+    gentity_t *bubble;
+
+    client->pers.bubbleTime = level.time + 500;
+    bubble = G_TempEntity( client->ps.origin, EV_PLAYER_TELEPORT_OUT );
+    bubble->s.clientNum = ent->s.clientNum;
+  }
+
   if( BG_InventoryContainsUpgrade( UP_MEDKIT, client->ps.stats ) &&
       BG_UpgradeIsActive( UP_MEDKIT, client->ps.stats ) )
   {
@@ -1516,7 +1543,7 @@ void ClientThink_real( gentity_t *ent )
     {
       BG_DeactivateUpgrade( UP_MEDKIT, client->ps.stats );
     }
-    else if( client->ps.stats[ STAT_HEALTH ] > 0 )
+    else if( client->ps.stats[ STAT_HEALTH ] > 0 && !level.paused )
     {
       //remove anti toxin
       BG_DeactivateUpgrade( UP_MEDKIT, client->ps.stats );
@@ -1553,6 +1580,9 @@ void ClientThink_real( gentity_t *ent )
 
   // set speed
   client->ps.speed = g_speed.value * BG_FindSpeedForClass( client->ps.stats[ STAT_PCLASS ] );
+
+  if( client->pers.paused )
+    client->ps.speed = 0;
 
   if( client->lastCreepSlowTime + CREEP_TIMEOUT < level.time )
     client->ps.stats[ STAT_STATE ] &= ~SS_CREEPSLOWED;
@@ -1643,6 +1673,8 @@ void ClientThink_real( gentity_t *ent )
   // save results of pmove
   if( ent->client->ps.eventSequence != oldEventSequence )
     ent->eventTime = level.time;
+
+  if ( level.paused ) client->ps.pm_type = real_pm_type;
 
   if( g_smoothClients.integer )
     BG_PlayerStateToEntityStateExtraPolate( &ent->client->ps, &ent->s, ent->client->ps.commandTime, qtrue );
@@ -1787,6 +1819,7 @@ void ClientThink_real( gentity_t *ent )
   // Give clients some credit periodically
   if( ent->client->lastKillTime + FREEKILL_PERIOD < level.time )
   {
+  if( g_suddenDeath.integer || g_extremeSuddenDeath.integer )
     if( !g_suddenDeath.integer ) {
       if( ent->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
         G_AddCreditToClient( ent->client, FREEKILL_ALIEN, qtrue );

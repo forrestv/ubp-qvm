@@ -1,0 +1,122 @@
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.2
+diff -u -p -r1.1.1.1.4.2 g_admin.c
+--- src/game/g_admin.c	17 Feb 2009 02:54:38 -0000	1.1.1.1.4.2
++++ src/game/g_admin.c	17 Feb 2009 03:23:09 -0000
+@@ -1236,6 +1236,27 @@ qboolean G_admin_ban_check( char *userin
+       return qtrue;
+     }
+   }
++  if ( *guid )
++  {
++    int count = 0;
++    qboolean valid = qtrue;
++
++    while( guid[ count ] != '\0' && valid )
++    {
++      if( (guid[ count ] < '0' || guid[ count ] > '9') &&
++          (guid[ count ] < 'A' || guid[ count ] > 'F') )
++      {
++        valid = qfalse;
++      }
++      count++;
++    }
++    if( !valid || count != 32 )
++    {
++      Com_sprintf( reason, rlen, "Invalid client data" );
++      G_Printf("Player with invalid GUID [%s] connect from IP %s\n", guid, ip);
++      return qtrue;
++    }
++  }
+   return qfalse;
+ }
+ 
+Index: src/game/g_client.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_client.c,v
+retrieving revision 1.1.1.1.4.1
+diff -u -p -r1.1.1.1.4.1 g_client.c
+--- src/game/g_client.c	17 Feb 2009 02:38:26 -0000	1.1.1.1.4.1
++++ src/game/g_client.c	17 Feb 2009 03:28:54 -0000
+@@ -1314,6 +1314,38 @@ char *ClientConnect( int clientNum, qboo
+   if( G_FilterPacket( value ) )
+     return "You are banned from this server.";
+ 
++  if( strlen( ip ) < 7 )
++  {
++    G_AdminsPrintf( "Connect from client with invalid IP: '%s' NAME: '%s^7'\n",
++      ip, Info_ValueForKey( userinfo, "name" ) );
++    return "Invalid client data";
++  }
++
++  // limit max clients per IP
++  if( g_maxGhosts.integer > 1 )
++  {
++    gclient_t *other;
++    int count = 0;
++
++    for( i = 0 ; i < level.maxclients; i++ )
++    {
++      other = &level.clients[ i ];
++      if( other &&
++        ( other->pers.connected == CON_CONNECTED || other->pers.connected == CON_CONNECTING ) &&
++          strcmp( ip, other->pers.ip ) == 0 )
++      {
++        count++;
++      }
++    }
++
++    if( count + 1 > g_maxGhosts.integer )
++    {
++    G_AdminsPrintf( "Connect from client exceeds %d maximum connections per IP: '%s' NAME: '%s^7'\n",
++      g_maxGhosts.integer, ip, Info_ValueForKey( userinfo, "name" ) );
++      return "Maximum simultaneous clients exceeded";
++    }
++  }
++
+   // check for a password
+   value = Info_ValueForKey( userinfo, "password" );
+ 
+Index: src/game/g_local.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_local.h,v
+retrieving revision 1.1.1.1.4.2
+diff -u -p -r1.1.1.1.4.2 g_local.h
+--- src/game/g_local.h	17 Feb 2009 03:12:27 -0000	1.1.1.1.4.2
++++ src/game/g_local.h	17 Feb 2009 03:23:09 -0000
+@@ -1344,6 +1344,8 @@ extern  vmCvar_t  g_banNotice;
+ 
+ extern  vmCvar_t  g_devmapKillerHP;
+ 
++extern  vmCvar_t  g_maxGhosts;
++
+ extern  vmCvar_t  g_privateMessages;
+ extern  vmCvar_t  g_decolourLogfiles;
+ extern  vmCvar_t  g_publicSayadmins;
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.3
+diff -u -p -r1.1.1.1.4.3 g_main.c
+--- src/game/g_main.c	17 Feb 2009 03:12:27 -0000	1.1.1.1.4.3
++++ src/game/g_main.c	17 Feb 2009 03:23:09 -0000
+@@ -168,6 +168,8 @@ vmCvar_t  g_devmapKillerHP;
+ 
+ vmCvar_t  g_buildLogMaxLength;
+ 
++vmCvar_t  g_maxGhosts;
++
+ vmCvar_t  g_tag;
+ 
+ vmCvar_t  g_dretchPunt;
+@@ -329,6 +331,8 @@ static cvarTable_t   gameCvarTable[ ] =
+   { &g_adminMapLog, "g_adminMapLog", "", CVAR_ROM, 0, qfalse  },
+   { &g_minLevelToJoinTeam, "g_minLevelToJoinTeam", "0", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_forceAutoSelect, "g_forceAutoSelect", "0", CVAR_ARCHIVE, 0, qtrue }, 
++
++  { &g_maxGhosts, "g_maxGhosts", "0", CVAR_ARCHIVE, 0, qfalse },
+   
+   { &g_privateMessages, "g_privateMessages", "1", CVAR_ARCHIVE, 0, qfalse  },
+   { &g_decolourLogfiles, "g_decolourLogfiles", "0", CVAR_ARCHIVE, 0, qfalse  },

@@ -1,0 +1,65 @@
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.1
+diff -u -p -r1.1.1.1.4.1 g_admin.c
+--- src/game/g_admin.c	17 Feb 2009 02:38:26 -0000	1.1.1.1.4.1
++++ src/game/g_admin.c	17 Feb 2009 02:52:23 -0000
+@@ -2724,6 +2724,9 @@ qboolean G_admin_maplog( gentity_t *ent,
+          case 'M':
+            result = "^6admin changed map";
+            break;
++         case 'l':
++           result = "^2layout vote";
++           break;
+          case 'D':
+            result = "^6admin loaded devmap";
+            break;
+@@ -2763,6 +2766,10 @@ qboolean G_admin_maplog( gentity_t *ent,
+     ptr = end;
+     count++;
+   }
++
++  if( g_nextMap.string[ 0 ] )
++    ADMBP( va( "^5NextMap override: %s\n", g_nextMap.string ) );
++
+   ADMBP_end( );
+ 
+   return qtrue;
+Index: src/game/g_cmds.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_cmds.c,v
+retrieving revision 1.1.1.1.4.1
+diff -u -p -r1.1.1.1.4.1 g_cmds.c
+--- src/game/g_cmds.c	17 Feb 2009 02:38:26 -0000	1.1.1.1.4.1
++++ src/game/g_cmds.c	17 Feb 2009 02:48:19 -0000
+@@ -1470,6 +1470,10 @@ void Cmd_CallVote_f( gentity_t *ent )
+     {
+       G_admin_maplog_result( "m" );
+     }
++    else if( !Q_stricmpn( level.voteString, "!restart", 8 ) )
++    {
++      G_admin_maplog_result( "l" );
++    }
+ 
+     level.voteExecuteTime = 0;
+     trap_SendConsoleCommand( EXEC_APPEND, va( "%s\n", level.voteString ) );
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.1
+diff -u -p -r1.1.1.1.4.1 g_main.c
+--- src/game/g_main.c	17 Feb 2009 02:38:26 -0000	1.1.1.1.4.1
++++ src/game/g_main.c	17 Feb 2009 02:48:19 -0000
+@@ -2286,7 +2286,10 @@ void CheckVote( void )
+     {
+       G_admin_maplog_result( "m" );
+     }
+-
++    else if( !Q_stricmpn( level.voteString, "!restart", 8 ) )
++    {
++      G_admin_maplog_result( "l" );
++    }
+ 
+     if( !Q_stricmp( level.voteString, "suddendeath" ) )
+     {

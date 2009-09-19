@@ -117,7 +117,8 @@ char *modNames[ ] =
 
   "MOD_ASPAWN",
   "MOD_ATUBE",
-  "MOD_OVERMIND"
+  "MOD_OVERMIND",
+  "MOD_SLAP"
 };
 
 /*
@@ -132,6 +133,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
   int       killer;
   int       i, j;
   char      *killerName, *obit;
+  float     totalTK = 0;
   float     totalDamage = 0.0f;
   float     percentDamage = 0.0f;
   gentity_t *player;
@@ -203,6 +205,14 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
   for( i = UP_NONE + 1; i < UP_NUM_UPGRADES; i++ )
     BG_DeactivateUpgrade( i, self->client->ps.stats );
 
+  if( meansOfDeath == MOD_SLAP )
+  {
+    trap_SendServerCommand( -1,
+      va( "print \"%s^7 felt %s^7's authority\n\"",
+      self->client->pers.netname, killerName ) );
+    goto finish_dying;
+  }
+
   // broadcast the death event to everyone
   if( !tk )
   {
@@ -223,6 +233,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
       va( "cp \"You killed ^1TEAMMATE^7 %s\"", self->client->pers.netname ) );
     G_LogOnlyPrintf("%s^7 was killed by ^1TEAMMATE^7 %s^7 (Did %d damage to %d max)\n",
       self->client->pers.netname, attacker->client->pers.netname, self->client->tkcredits[ attacker->s.number ], self->client->ps.stats[ STAT_MAX_HEALTH ] );
+    G_admin_tklog_log( attacker, self, meansOfDeath );
   }
 
   self->enemy = attacker;
@@ -242,57 +253,21 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
   {
     attacker->client->lastkilled_client = self->s.number;
 
-   if( g_devmapKillerHP.integer && g_cheats.integer ) 
+   if( g_killerHP.integer ||
+       ( g_devmapKillerHP.integer && g_cheats.integer ) )
    {
-     trap_SendServerCommand( self-g_entities, va( "print \"Your killer, %s, had %3i HP.\n\"", killerName, attacker->health ) );
+     trap_SendServerCommand( self-g_entities,
+       va( "print \"Your killer, %s^7, had %3i HP.\n\"",
+         killerName, attacker->health ) );
    }
 
     if( attacker == self || OnSameTeam( self, attacker ) )
     {
       AddScore( attacker, -1 );
 
-      // Retribution: transfer value of player from attacker to victim
-      if( g_retribution.integer) {
-          if(attacker!=self){
-        int max = ALIEN_MAX_KILLS, tk_value = 0;
-        char *type = "evos";
-
-        if( attacker->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS ) 
-        {
-            tk_value = BG_ClassCanEvolveFromTo( PCL_ALIEN_LEVEL0,
-            self->client->ps.stats[ STAT_PCLASS ], ALIEN_MAX_KILLS, 0 );
-        } else 
-        {
-          tk_value = BG_GetValueOfEquipment( &self->client->ps );
-          max = HUMAN_MAX_CREDITS;
-          type = "credits";
-        }
-
-        if( attacker->client->ps.persistant[ PERS_CREDIT ] < tk_value )
-          tk_value = attacker->client->ps.persistant[ PERS_CREDIT ];
-        if( self->client->ps.persistant[ PERS_CREDIT ]+tk_value > max )
-          tk_value = max-self->client->ps.persistant[ PERS_CREDIT ];
-
-        if( tk_value > 0 ) {
-
-          // adjust using the retribution cvar (in percent)
-          tk_value = tk_value*g_retribution.integer/100;
-
-          G_AddCreditToClient( self->client, tk_value, qtrue );
-          G_AddCreditToClient( attacker->client, -tk_value, qtrue );
-
-          trap_SendServerCommand( self->client->ps.clientNum,
-            va( "print \"Received ^3%d %s ^7from %s ^7in retribution.\n\"",
-            tk_value, type, attacker->client->pers.netname ) );
-          trap_SendServerCommand( attacker->client->ps.clientNum,
-            va( "print \"Transfered ^3%d %s ^7to %s ^7in retribution.\n\"",
-            tk_value, type, self->client->pers.netname ) );
-        }
-          }
-      }
-
       // Normal teamkill penalty
-      else {
+      if( !g_retribution.integer )
+      {
         if( attacker->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
           G_AddCreditToClient( attacker->client, -FREEKILL_ALIEN, qtrue );
         else if( attacker->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
@@ -333,7 +308,129 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
   //total up all the damage done by every client
   for( i = 0; i < MAX_CLIENTS; i++ )
+  {
     totalDamage += (float)self->credits[ i ];
+    totalTK += (float)self->client->tkcredits[ i ];
+  }
+  // punish players for damaging teammates
+  if ( g_retribution.integer && totalTK )
+  {
+    int totalPrice;
+    int max = HUMAN_MAX_CREDITS;
+
+    if ( self->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
+    {
+      totalPrice = BG_ClassCanEvolveFromTo( PCL_ALIEN_LEVEL0, self->client->ps.stats[ STAT_PCLASS ], ALIEN_MAX_KILLS, 0 );
+      max = ALIEN_MAX_KILLS;
+    }
+    else
+    {
+      totalPrice = BG_GetValueOfEquipment( &self->client->ps );
+    }
+
+    if ( self->client->ps.persistant[ PERS_CREDIT ] + totalPrice > max )
+      totalPrice = max - self->client->ps.persistant[ PERS_CREDIT ];
+
+    if ( totalPrice > 0 )
+    {
+      totalTK += totalDamage;
+      if( totalTK < self->client->ps.stats[ STAT_MAX_HEALTH ] )
+        totalTK = self->client->ps.stats[ STAT_MAX_HEALTH ];
+
+      if ( self->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
+      {
+        for ( i = 0; i < MAX_CLIENTS; i++ )
+        {
+          int price;
+          // no retribution if self damage or enemy damage or building damage or no damage from this client
+          if ( i == self - g_entities || !g_entities[ i ].client ||
+               !OnSameTeam( &g_entities[ i ], self ) ||
+               !self->client->tkcredits[ i ] )
+            continue;
+
+          // calculate retribution price (rounded up)
+          price = ( totalPrice * self->client->tkcredits[ i ] ) / totalTK + 0.5f;
+          self->client->tkcredits[ i ] = 0;
+
+          // check for enough credits
+          if ( g_entities[ i ].client->ps.persistant[ PERS_CREDIT ] < price )
+            price = g_entities[ i ].client->ps.persistant[ PERS_CREDIT ];
+          if ( price )
+          {
+            G_AddCreditToClient( self->client, price, qtrue );
+            G_AddCreditToClient( g_entities[ i ].client, -price, qtrue );
+
+            trap_SendServerCommand( self->client->ps.clientNum,
+              va( "print \"Received ^3%d credits ^7from %s ^7in retribution.\n\"",
+                price, g_entities[ i ].client->pers.netname ) );
+            trap_SendServerCommand( g_entities[ i ].client->ps.clientNum,
+              va( "print \"Transfered ^3%d credits ^7to %s ^7in retribution.\n\"",
+                price, self->client->pers.netname ) );
+          }
+        }
+      }
+      else
+      {
+        int toPay[ MAX_CLIENTS ] = { 0 };
+        int frags = totalPrice;
+        int damageForEvo = totalTK / totalPrice;
+        for ( i = 0; i < MAX_CLIENTS; i++ )
+        {
+          // no retribution if self damage or enemy damage or building damage or no damage from this client
+          if ( i == self - g_entities || !g_entities[ i ].client ||
+               !OnSameTeam( &g_entities[ i ], self ) ||
+               !self->client->tkcredits[ i ] )
+            continue;
+
+          // find out how many full evos this client needs to pay
+          toPay[ i ] = ( totalPrice * self->client->tkcredits[ i ] ) / totalTK;
+          if ( toPay[ i ] > g_entities[ i ].client->ps.persistant[ PERS_CREDIT ] )
+            toPay[ i ] = g_entities[ i ].client->ps.persistant[ PERS_CREDIT ];
+          frags -= toPay[ i ];
+          self->client->tkcredits[ i ] -= damageForEvo * toPay[ i ];
+        }
+
+        // if we have not met the evo count, continue stealing evos
+        while ( 1 )
+        {
+          int maximum = 0;
+          int topClient = 0;
+          for ( i = 0; i < MAX_CLIENTS; i++ )
+          {
+            if ( self->client->tkcredits[ i ] > maximum && g_entities[ i ].client->ps.persistant[ PERS_CREDIT ] )
+            {
+              maximum = self->client->tkcredits[ i ];
+              topClient = i;
+            }
+          }
+          if ( !maximum )
+            break;
+          toPay[ topClient ]++;
+          self->client->tkcredits[ topClient ] = 0;
+          frags--;
+          if ( !frags )
+           break;
+        }
+        
+        // now move the evos around
+        for ( i = 0; i < MAX_CLIENTS; i++ )
+        {
+          if ( !toPay[ i ] )
+            continue;
+          
+          G_AddCreditToClient( self->client, toPay[ i ], qtrue );
+          G_AddCreditToClient( g_entities[ i ].client, -toPay[ i ], qtrue );
+
+          trap_SendServerCommand( self->client->ps.clientNum,
+            va( "print \"Received ^3%d ^7evos from %s ^7in retribution.\n\"",
+              toPay[ i ], g_entities[ i ].client->pers.netname ) );
+          trap_SendServerCommand( g_entities[ i ].client->ps.clientNum,
+            va( "print \"Transfered ^3%d ^7evos to %s ^7in retribution.\n\"",
+              toPay[ i ], self->client->pers.netname ) );
+        }
+      }
+    }
+  }
 
   // if players did more than DAMAGE_FRACTION_FOR_KILL increment the stage counters
   if( !OnSameTeam( self, attacker ) && totalDamage >= ( self->client->ps.stats[ STAT_MAX_HEALTH ] * DAMAGE_FRACTION_FOR_KILL ) )
@@ -496,6 +593,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
     if( client->sess.spectatorClient == self->s.number )
       ScoreboardMessage( g_entities + i );
   }
+
+finish_dying: // from MOD_SLAP
 
   VectorCopy( self->s.origin, self->client->pers.lastDeathLocation );
 
@@ -1079,6 +1178,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
   if( !attacker )
     attacker = &g_entities[ ENTITYNUM_WORLD ];
 
+  if( attacker->client && attacker->client->pers.paused )
+    return;
+
   // shootable doors / buttons don't actually have any health
   if( targ->s.eType == ET_MOVER )
   {
@@ -1094,6 +1196,8 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
   if( client )
   {
     if( client->noclip && !g_devmapNoGod.integer)
+      return;
+    if( client->pers.paused )
       return;
   }
 
@@ -1227,6 +1331,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
     // check for godmode
     if ( targ->flags & FL_GODMODE && !g_devmapNoGod.integer)
+      return;
+
+    if( level.paused )
       return;
     
     if(targ->s.eType == ET_BUILDABLE && g_cheats.integer && g_devmapNoStructDmg.integer)
@@ -1607,3 +1714,48 @@ qboolean G_RadiusDamage( vec3_t origin, gentity_t *attacker, float damage,
 
   return hitClient;
 }
+
+/*
+============
+G_Knockback
+============
+*/
+void G_Knockback( gentity_t *targ, vec3_t dir, int knockback )
+{
+  if( knockback && targ->client )
+  {
+    vec3_t  kvel;
+    float   mass;
+
+    mass = 200;
+
+    // Halve knockback for bsuits
+    if( targ->client &&
+        targ->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS &&
+        BG_InventoryContainsUpgrade( UP_BATTLESUIT, targ->client->ps.stats ) )
+      mass += 400;
+
+    // Halve knockback for crouching players
+    if(targ->client->ps.pm_flags&PMF_DUCKED) knockback /= 2;
+
+    VectorScale( dir, g_knockback.value * (float)knockback / mass, kvel );
+    VectorAdd( targ->client->ps.velocity, kvel, targ->client->ps.velocity );
+
+    // set the timer so that the other client can't cancel
+    // out the movement immediately
+    if( !targ->client->ps.pm_time )
+    {
+      int   t;
+
+      t = knockback * 2;
+      if( t < 50 )
+        t = 50;
+
+      if( t > 200 )
+        t = 200;
+      targ->client->ps.pm_time = t;
+      targ->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
+    }
+  }
+}
+

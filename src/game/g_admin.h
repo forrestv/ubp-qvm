@@ -36,6 +36,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_ADMIN_BANS 1024
 #define MAX_ADMIN_NAMELOGS 128
 #define MAX_ADMIN_NAMELOG_NAMES 5
+#define MAX_ADMIN_ADMINLOGS 128
+#define MAX_ADMIN_ADMINLOG_ARGS 50
+#define MAX_ADMIN_TKLOGS 64
 #define MAX_ADMIN_FLAG_LEN 20
 #define MAX_ADMIN_FLAGS 1024
 #define MAX_ADMIN_COMMANDS 64
@@ -149,6 +152,31 @@ typedef struct g_admin_namelog
 }
 g_admin_namelog_t;
 
+typedef struct g_admin_adminlog
+{
+  char      name[ MAX_NAME_LENGTH ];
+  char      command[ MAX_ADMIN_CMD_LEN ];
+  char      args[ MAX_ADMIN_ADMINLOG_ARGS ];
+  int       id;
+  int       time;
+  int       level;
+  qboolean  success;
+}
+g_admin_adminlog_t;
+
+typedef struct g_admin_tklog
+{
+  char      name[ MAX_NAME_LENGTH ];
+  char      victim[ MAX_NAME_LENGTH ];
+  int       id;
+  int       time;
+  int       damage;
+  int       value;
+  int       team;
+  int       weapon;
+}
+g_admin_tklog_t;
+
 qboolean G_admin_ban_check( char *userinfo, char *reason, int rlen );
 qboolean G_admin_cmd_check( gentity_t *ent, qboolean say );
 qboolean G_admin_readconfig( gentity_t *ent, int skiparg );
@@ -169,6 +197,12 @@ qboolean G_admin_subnetban( gentity_t *ent, int skiparg );
 qboolean G_admin_ban( gentity_t *ent, int skiparg );
 qboolean G_admin_unban( gentity_t *ent, int skiparg );
 qboolean G_admin_putteam( gentity_t *ent, int skiparg );
+qboolean G_admin_adminlog( gentity_t *ent, int skiparg );
+void G_admin_adminlog_cleanup( void );
+void G_admin_adminlog_log( gentity_t *ent, char *command, char *args, int skiparg, qboolean success );
+qboolean G_admin_tklog( gentity_t *ent, int skiparg );
+void G_admin_tklog_cleanup( void );
+void G_admin_tklog_log( gentity_t *attacker, gentity_t *victim, int meansOfDeath );
 qboolean G_admin_listadmins( gentity_t *ent, int skiparg );
 qboolean G_admin_listlayouts( gentity_t *ent, int skiparg );
 qboolean G_admin_listplayers( gentity_t *ent, int skiparg );
@@ -179,8 +213,10 @@ qboolean G_admin_devmap( gentity_t *ent, int skiparg );
 void G_admin_maplog_update( void );
 qboolean G_admin_maplog( gentity_t *ent, int skiparg );
 qboolean G_admin_layoutsave( gentity_t *ent, int skiparg );
+qboolean G_admin_demo( gentity_t *ent, int skiparg );
 qboolean G_admin_mute( gentity_t *ent, int skiparg );
 qboolean G_admin_denybuild( gentity_t *ent, int skiparg );
+qboolean G_admin_denyweapon( gentity_t *ent, int skiparg );
 qboolean G_admin_showbans( gentity_t *ent, int skiparg );
 qboolean G_admin_help( gentity_t *ent, int skiparg );
 qboolean G_admin_admintest( gentity_t *ent, int skiparg );
@@ -204,7 +240,14 @@ qboolean G_admin_L1( gentity_t *ent, int skiparg );
 qboolean G_admin_putmespec( gentity_t *ent, int skiparg );
 qboolean G_admin_warn( gentity_t *ent, int skiparg );
 qboolean G_admin_designate( gentity_t *ent, int skiparg );
+qboolean G_admin_noclip( gentity_t *ent, int skiparg );
+qboolean G_admin_godmode( gentity_t *ent, int skiparg );
 qboolean G_admin_cp( gentity_t *ent, int skiparg );
+
+qboolean G_admin_slap( gentity_t *ent, int skiparg );
+qboolean G_admin_drop( gentity_t *ent, int skiparg );
+qboolean G_admin_bubble( gentity_t *ent, int skiparg );
+qboolean G_admin_override( gentity_t *ent, int skiparg );
 
 void G_admin_print( gentity_t *ent, char *m );
 void G_admin_buffer_print( gentity_t *ent, char *m );

@@ -1,0 +1,192 @@
+Index: src/game/g_client.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_client.c,v
+retrieving revision 1.1.1.1.4.2
+diff -u -p -r1.1.1.1.4.2 g_client.c
+--- src/game/g_client.c	17 Feb 2009 03:30:08 -0000	1.1.1.1.4.2
++++ src/game/g_client.c	17 Feb 2009 04:33:41 -0000
+@@ -81,6 +81,97 @@ void SP_info_human_intermission( gentity
+ 
+ /*
+ ===============
++G_OverflowCredits
++===============
++*/
++void G_OverflowCredits( gclient_t *doner, int credits )
++{
++  int i;
++  int maxCredits;
++  int clientNum;
++
++  if( !g_creditOverflow.integer )
++    return;
++
++  if( doner->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
++  {
++    maxCredits = ALIEN_MAX_KILLS;
++    clientNum = level.lastCreditedAlien;
++  }
++  else if( doner->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
++  {
++    maxCredits = HUMAN_MAX_CREDITS;
++    clientNum = level.lastCreditedHuman;
++  }
++  else
++  {
++    return;
++  }
++
++  if( g_creditOverflow.integer == 1 )
++  {
++    // distribute to everyone on team
++    gentity_t *vic;
++
++    i = 0;
++    while( credits > 0 && i < level.maxclients )
++    {
++      i++;
++      clientNum++;
++      if( clientNum >= level.maxclients )
++        clientNum = 0;
++
++      vic = &g_entities[ clientNum ];
++      if( vic->client->ps.stats[ STAT_PTEAM ] != doner->ps.stats[ STAT_PTEAM ] ||
++          vic->client->ps.persistant[ PERS_CREDIT ] >= maxCredits )
++        continue;
++
++      if( vic->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
++        level.lastCreditedAlien = clientNum;
++      else
++        level.lastCreditedHuman = clientNum;
++
++      if( vic->client->ps.persistant[ PERS_CREDIT ] + credits > maxCredits )
++      {
++        credits -= maxCredits - vic->client->ps.persistant[ PERS_CREDIT ];
++        vic->client->ps.persistant[ PERS_CREDIT ] = maxCredits;
++      }
++      else
++      {
++        vic->client->ps.persistant[ PERS_CREDIT ] += credits;
++        return;
++      }
++    }
++  }
++  else if( g_creditOverflow.integer == 2 )
++  {
++    // distribute by team rank
++    gclient_t *cl;
++
++    for( i = 0; i < level.numPlayingClients && credits > 0; i++ )
++    {
++      // get the client list sorted by rank
++      cl = &level.clients[ level.sortedClients[ i ] ];
++      if( cl->ps.stats[ STAT_PTEAM ] != doner->ps.stats[ STAT_PTEAM ] ||
++          cl->ps.persistant[ PERS_CREDIT ] >= maxCredits )
++        continue;
++
++      if( cl->ps.persistant[ PERS_CREDIT ] + credits > maxCredits )
++      {
++        credits -= maxCredits - cl->ps.persistant[ PERS_CREDIT ];
++        cl->ps.persistant[ PERS_CREDIT ] = maxCredits;
++      }
++      else
++      {
++        cl->ps.persistant[ PERS_CREDIT ] += credits;
++        return;
++      }
++    }
++  }
++}
++
++/*
++===============
+ G_AddCreditToClient
+ ===============
+ */
+@@ -96,13 +187,19 @@ void G_AddCreditToClient( gclient_t *cli
+     {
+       if( client->pers.credit >= ALIEN_MAX_KILLS &&
+           credit > 0 )
++      {
++        G_OverflowCredits( client, credit );
+         return;
++      }
+     }
+     else if( client->pers.teamSelection == PTE_HUMANS )
+     {
+       if( client->pers.credit >= HUMAN_MAX_CREDITS &&
+           credit > 0 )
++      {
++        G_OverflowCredits( client, credit );
+         return;
++      }
+     }
+   }
+ 
+@@ -113,12 +210,18 @@ void G_AddCreditToClient( gclient_t *cli
+     if( client->pers.teamSelection == PTE_ALIENS )
+     {
+       if( client->pers.credit > ALIEN_MAX_KILLS )
++      {
++        G_OverflowCredits( client, client->ps.persistant[ PERS_CREDIT ] - ALIEN_MAX_KILLS );
+         client->pers.credit = ALIEN_MAX_KILLS;
++      }
+     }
+     else if( client->pers.teamSelection == PTE_HUMANS )
+     {
+       if( client->pers.credit > HUMAN_MAX_CREDITS )
++      {
++        G_OverflowCredits( client, client->ps.persistant[ PERS_CREDIT ] - HUMAN_MAX_CREDITS );
+         client->pers.credit = HUMAN_MAX_CREDITS;
++      }
+     }
+   }
+ 
+Index: src/game/g_local.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_local.h,v
+retrieving revision 1.1.1.1.4.3
+diff -u -p -r1.1.1.1.4.3 g_local.h
+--- src/game/g_local.h	17 Feb 2009 03:30:08 -0000	1.1.1.1.4.3
++++ src/game/g_local.h	17 Feb 2009 04:33:41 -0000
+@@ -747,6 +747,9 @@ typedef struct
+   qboolean paused;
+   int pausedTime;
+ 
++  int               lastCreditedAlien;
++  int               lastCreditedHuman;
++
+   int unlaggedIndex;
+   int unlaggedTimes[ MAX_UNLAGGED_MARKERS ];
+ 
+@@ -1285,6 +1288,7 @@ extern  vmCvar_t  pmove_fixed;
+ extern  vmCvar_t  pmove_msec;
+ extern  vmCvar_t  g_rankings;
+ extern  vmCvar_t  g_allowShare;
++extern  vmCvar_t  g_creditOverflow;
+ extern  vmCvar_t  g_enableDust;
+ extern  vmCvar_t  g_enableBreath;
+ extern  vmCvar_t  g_singlePlayer;
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.6
+diff -u -p -r1.1.1.1.4.6 g_main.c
+--- src/game/g_main.c	17 Feb 2009 04:32:15 -0000	1.1.1.1.4.6
++++ src/game/g_main.c	17 Feb 2009 04:33:41 -0000
+@@ -175,6 +175,7 @@ vmCvar_t  g_tag;
+ vmCvar_t  g_dretchPunt;
+ 
+ vmCvar_t  g_allowShare;
++vmCvar_t  g_creditOverflow;
+ 
+ vmCvar_t  g_devmapNoGod;
+ vmCvar_t  g_devmapNoStructDmg;
+@@ -355,6 +356,7 @@ static cvarTable_t   gameCvarTable[ ] =
+   
+   { &g_rankings, "g_rankings", "0", 0, 0, qfalse },
+   { &g_allowShare, "g_allowShare", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse},
++  { &g_creditOverflow, "g_creditOverflow", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse},
+   { &g_banNotice, "g_banNotice", "", CVAR_ARCHIVE, 0, qfalse  },
+ };
+ 

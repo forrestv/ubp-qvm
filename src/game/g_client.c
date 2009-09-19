@@ -81,6 +81,97 @@ void SP_info_human_intermission( gentity_t *ent )
 
 /*
 ===============
+G_OverflowCredits
+===============
+*/
+void G_OverflowCredits( gclient_t *doner, int credits )
+{
+  int i;
+  int maxCredits;
+  int clientNum;
+
+  if( !g_creditOverflow.integer )
+    return;
+
+  if( doner->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
+  {
+    maxCredits = ALIEN_MAX_KILLS;
+    clientNum = level.lastCreditedAlien;
+  }
+  else if( doner->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
+  {
+    maxCredits = HUMAN_MAX_CREDITS;
+    clientNum = level.lastCreditedHuman;
+  }
+  else
+  {
+    return;
+  }
+
+  if( g_creditOverflow.integer == 1 )
+  {
+    // distribute to everyone on team
+    gentity_t *vic;
+
+    i = 0;
+    while( credits > 0 && i < level.maxclients )
+    {
+      i++;
+      clientNum++;
+      if( clientNum >= level.maxclients )
+        clientNum = 0;
+
+      vic = &g_entities[ clientNum ];
+      if( vic->client->ps.stats[ STAT_PTEAM ] != doner->ps.stats[ STAT_PTEAM ] ||
+          vic->client->ps.persistant[ PERS_CREDIT ] >= maxCredits )
+        continue;
+
+      if( vic->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
+        level.lastCreditedAlien = clientNum;
+      else
+        level.lastCreditedHuman = clientNum;
+
+      if( vic->client->ps.persistant[ PERS_CREDIT ] + credits > maxCredits )
+      {
+        credits -= maxCredits - vic->client->ps.persistant[ PERS_CREDIT ];
+        vic->client->ps.persistant[ PERS_CREDIT ] = maxCredits;
+      }
+      else
+      {
+        vic->client->ps.persistant[ PERS_CREDIT ] += credits;
+        return;
+      }
+    }
+  }
+  else if( g_creditOverflow.integer == 2 )
+  {
+    // distribute by team rank
+    gclient_t *cl;
+
+    for( i = 0; i < level.numPlayingClients && credits > 0; i++ )
+    {
+      // get the client list sorted by rank
+      cl = &level.clients[ level.sortedClients[ i ] ];
+      if( cl->ps.stats[ STAT_PTEAM ] != doner->ps.stats[ STAT_PTEAM ] ||
+          cl->ps.persistant[ PERS_CREDIT ] >= maxCredits )
+        continue;
+
+      if( cl->ps.persistant[ PERS_CREDIT ] + credits > maxCredits )
+      {
+        credits -= maxCredits - cl->ps.persistant[ PERS_CREDIT ];
+        cl->ps.persistant[ PERS_CREDIT ] = maxCredits;
+      }
+      else
+      {
+        cl->ps.persistant[ PERS_CREDIT ] += credits;
+        return;
+      }
+    }
+  }
+}
+
+/*
+===============
 G_AddCreditToClient
 ===============
 */
@@ -96,13 +187,19 @@ void G_AddCreditToClient( gclient_t *client, short credit, qboolean cap )
     {
       if( client->pers.credit >= ALIEN_MAX_KILLS &&
           credit > 0 )
+      {
+        G_OverflowCredits( client, credit );
         return;
+      }
     }
     else if( client->pers.teamSelection == PTE_HUMANS )
     {
       if( client->pers.credit >= HUMAN_MAX_CREDITS &&
           credit > 0 )
+      {
+        G_OverflowCredits( client, credit );
         return;
+      }
     }
   }
 
@@ -113,12 +210,18 @@ void G_AddCreditToClient( gclient_t *client, short credit, qboolean cap )
     if( client->pers.teamSelection == PTE_ALIENS )
     {
       if( client->pers.credit > ALIEN_MAX_KILLS )
+      {
+        G_OverflowCredits( client, client->ps.persistant[ PERS_CREDIT ] - ALIEN_MAX_KILLS );
         client->pers.credit = ALIEN_MAX_KILLS;
+      }
     }
     else if( client->pers.teamSelection == PTE_HUMANS )
     {
       if( client->pers.credit > HUMAN_MAX_CREDITS )
+      {
+        G_OverflowCredits( client, client->ps.persistant[ PERS_CREDIT ] - HUMAN_MAX_CREDITS );
         client->pers.credit = HUMAN_MAX_CREDITS;
+      }
     }
   }
 
@@ -1328,6 +1431,38 @@ char *ClientConnect( int clientNum, qboolean firstTime )
   if( G_FilterPacket( value ) )
     return "You are banned from this server.";
 
+  if( strlen( ip ) < 7 )
+  {
+    G_AdminsPrintf( "Connect from client with invalid IP: '%s' NAME: '%s^7'\n",
+      ip, Info_ValueForKey( userinfo, "name" ) );
+    return "Invalid client data";
+  }
+
+  // limit max clients per IP
+  if( g_maxGhosts.integer > 1 )
+  {
+    gclient_t *other;
+    int count = 0;
+
+    for( i = 0 ; i < level.maxclients; i++ )
+    {
+      other = &level.clients[ i ];
+      if( other &&
+        ( other->pers.connected == CON_CONNECTED || other->pers.connected == CON_CONNECTING ) &&
+          strcmp( ip, other->pers.ip ) == 0 )
+      {
+        count++;
+      }
+    }
+
+    if( count + 1 > g_maxGhosts.integer )
+    {
+    G_AdminsPrintf( "Connect from client exceeds %d maximum connections per IP: '%s' NAME: '%s^7'\n",
+      g_maxGhosts.integer, ip, Info_ValueForKey( userinfo, "name" ) );
+      return "Maximum simultaneous clients exceeded";
+    }
+  }
+
   // check for a password
   value = Info_ValueForKey( userinfo, "password" );
 
@@ -1692,6 +1827,15 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, vec3_t origin, vec3_t angles
     ent->credits[ i ] = 0;
 
   client->ps.stats[ STAT_STAMINA ] = MAX_STAMINA;
+
+  //free credits
+  if( g_freeCredits.integer && ent != spawn )
+  {
+    if( client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
+      client->ps.persistant[ PERS_CREDIT ] = ALIEN_MAX_KILLS;
+    else if( client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
+      client->ps.persistant[ PERS_CREDIT ] = HUMAN_MAX_CREDITS;
+  }
 
   G_SetOrigin( ent, spawn_origin );
   VectorCopy( spawn_origin, client->ps.origin );

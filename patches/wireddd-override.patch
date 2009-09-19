@@ -1,0 +1,332 @@
+Index: src/game/g_local.h
+===================================================================
+--- src/game/g_local.h	(revision 20)
++++ src/game/g_local.h	(working copy)
+@@ -406,6 +406,7 @@
+   char                ip[ 16 ];
+   qboolean            muted;
+   qboolean            denyBuild;
++  qboolean            override;
+   qboolean            paused;
+   int                 adminLevel;
+   qboolean            designatedBuilder;
+Index: src/game/g_admin.c
+===================================================================
+--- src/game/g_admin.c	(revision 20)
++++ src/game/g_admin.c	(working copy)
+@@ -276,7 +276,17 @@
+       "change the build points for humans",
+       "[^3#^7]"
+     },
++  
++    {"allowoverride", G_admin_override, "O",
++      "override checks for various things",
++      "(^5name|slot^7)"
++    },
+ 
++    {"denyoverride", G_admin_override, "O",
++      "deny override",
++      "(^5name|slot^7)"
++    },
++
+     {"restart", G_admin_restart, "r",
+       "restart the current map (optionally using named layout or "
+       "keeping/switching teams)",
+@@ -4374,6 +4384,97 @@
+   return qtrue;
+ }
+ 
++qboolean G_admin_override( gentity_t *ent, int skiparg )
++{ //this is all very similar to denybuild, 
++  //it performs an essentially identical function
++  int i, j = 0, pids[ MAX_CLIENTS + 1 ];
++  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
++  char command[ MAX_ADMIN_CMD_LEN ], *cmd;
++  qboolean targeted = qfalse;
++  //targeted is set to ensure we don't get spam when pausing everybody
++  gentity_t *vic;
++
++  G_SayArgv( skiparg, command, sizeof( command ) );
++  cmd = command;
++  if( cmd && *cmd == '!' )
++    cmd++;
++  if( G_SayArgc() == 1 + skiparg )
++  {
++    for( i = 0; i < MAX_CLIENTS; i++ )
++    {
++      vic = &g_entities[ i ];
++      if( vic && vic->client &&
++          vic->client->pers.connected == CON_CONNECTED )
++      {
++	pids[ j ] = i;
++        j++;
++      }
++    }
++    pids[ j ] = -1;
++  }
++  else if( G_SayArgc() == 2 + skiparg )
++  {
++    G_SayArgv( 1 + skiparg, name, sizeof( name ) );
++    if( G_ClientNumbersFromString( name, pids ) != 1 )
++    {
++      G_MatchOnePlayer( pids, err, sizeof( err ) );
++      ADMP( va( "^3!%s: ^7%s\n", cmd, err ) );
++      return qfalse;
++    }
++    targeted = qtrue;
++  }
++  else if( G_SayArgc() > 2 + skiparg )
++  {
++    ADMP( va( "^3!%s: ^7usage: ^3!%s ^7(^5name|slot^7)\n", cmd, cmd ) );
++    return qfalse;
++  }
++  for( i = 0; pids[ i ] >= 0; i++ )
++  {
++    vic = &g_entities[ pids[ i ] ];
++    if ( !vic || !vic->client ) continue;
++    if( !admin_higher( ent, vic ) )
++    {
++      if( targeted )
++	ADMP( va( "^3!%s: ^7sorry, but your intended victim has a higher admin"
++		    " level than you\n", cmd ) );
++      continue;
++    }
++    if( vic->client->pers.override )
++    {
++      if( !Q_stricmp( cmd, "allowoverride" ) )
++      {
++        if( targeted )
++	  ADMP( "^3!allowoverride: ^7player already allowed to override\n" );
++	continue;
++      }
++      vic->client->pers.override = qfalse;
++      CPx( pids[ i ], "cp \"^2You've been denied override\"" );
++      if( targeted )
++	AP( va( "print \"^3!denyoverride: ^7%s^7 override denied by %s\n\"",
++	    vic->client->pers.netname,
++	    ( ent ) ? ent->client->pers.netname : "console" ) );
++    }
++    else
++    {
++      if( !Q_stricmp( cmd, "denyoverride" ) )
++      {
++	if( targeted )
++	  ADMP( "^3!denyoverride: ^7player is already denied overide\n" );
++	continue;
++      }
++      vic->client->pers.override = qtrue;
++      CPx( pids[ i ], va( "cp \"^1You've been allowed to override by ^7%s\"", 
++	  ( ent ) ? ent->client->pers.netname : "console" ) );
++      if( targeted )
++	AP( va( "print \"^3!allowoverride: ^7%s^7 allowed to override by %s\n\"", 
++	    vic->client->pers.netname,
++            ( ent ) ? ent->client->pers.netname : "console" ) );
++    }
++    ClientUserinfoChanged( pids[ i ] );
++  }
++  return qtrue;
++}
++
+ /*
+ ================
+  G_admin_print
+Index: src/game/g_admin.h
+===================================================================
+--- src/game/g_admin.h	(revision 20)
++++ src/game/g_admin.h	(working copy)
+@@ -200,6 +200,7 @@
+ qboolean G_admin_hbps( gentity_t *ent, int skiparg ); 
+ qboolean G_admin_hstage( gentity_t *ent, int skiparg ); 
+ qboolean G_admin_astage( gentity_t *ent, int skiparg );
++qboolean G_admin_override( gentity_t *ent, int skiparg );
+ void G_admin_print( gentity_t *ent, char *m );
+ void G_admin_buffer_print( gentity_t *ent, char *m );
+ void G_admin_buffer_begin( void );
+Index: src/game/g_cmds.c
+===================================================================
+--- src/game/g_cmds.c	(revision 20)
++++ src/game/g_cmds.c	(working copy)
+@@ -2218,7 +2218,8 @@
+     allowedClasses[ numClasses++ ] = PCL_ALIEN_BUILDER0;
+ 
+   if( BG_ClassIsAllowed( PCL_ALIEN_BUILDER0_UPG ) &&
+-      BG_FindStagesForClass( PCL_ALIEN_BUILDER0_UPG, g_alienStage.integer ) )
++      ( BG_FindStagesForClass( PCL_ALIEN_BUILDER0_UPG, g_alienStage.integer ) ||
++        !ent->client->pers.override) )
+     allowedClasses[ numClasses++ ] = PCL_ALIEN_BUILDER0_UPG;
+ 
+   if( BG_ClassIsAllowed( PCL_ALIEN_LEVEL0 ) )
+@@ -2254,15 +2255,17 @@
+       {
+         other = &g_entities[ entityList[ i ] ];
+ 
+-        if( ( other->client && other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
+-            ( other->s.eType == ET_BUILDABLE && other->biteam == BIT_HUMANS ) )
++        if( (( other->client && other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
++            ( other->s.eType == ET_BUILDABLE && other->biteam == BIT_HUMANS ))  &&
++        !ent->client->pers.override )
+         {
+           G_TriggerMenu( clientNum, MN_A_TOOCLOSE );
+           return;
+         }
+       }
+ 
+-      if( !level.overmindPresent )
++      if( !level.overmindPresent  &&
++        !ent->client->pers.override)
+       {
+         G_TriggerMenu( clientNum, MN_A_NOOVMND_EVOLVE );
+         return;
+@@ -2271,7 +2274,8 @@
+       //guard against selling the HBUILD weapons exploit
+       if( ( currentClass == PCL_ALIEN_BUILDER0 ||
+             currentClass == PCL_ALIEN_BUILDER0_UPG ) &&
+-          ent->client->ps.stats[ STAT_MISC ] > 0 )
++          ent->client->ps.stats[ STAT_MISC ] > 0  &&
++        !ent->client->pers.override )
+       {
+         trap_SendServerCommand( ent-g_entities,
+             va( "print \"You cannot evolve until build timer expires\n\"" ) );
+@@ -2285,9 +2289,9 @@
+       if( G_RoomForClassChange( ent, newClass, infestOrigin ) )
+       {
+         //...check we can evolve to that class
+-        if( numLevels >= 0 &&
++        if( (numLevels >= 0 &&
+             BG_FindStagesForClass( newClass, g_alienStage.integer ) &&
+-            BG_ClassIsAllowed( newClass ) )
++            BG_ClassIsAllowed( newClass ) ) || ent->client->pers.override )
+         {
+           G_LogOnlyPrintf("ClientTeamClass: %i alien %s\n", clientNum, s);
+ 
+@@ -2609,7 +2613,7 @@
+   upgrade = BG_FindUpgradeNumForName( s );
+   weapon = BG_FindWeaponNumForName( s );
+ 
+-  if( upgrade != UP_NONE && BG_InventoryContainsUpgrade( upgrade, ent->client->ps.stats ) )
++  if( upgrade != UP_NONE && BG_InventoryContainsUpgrade( upgrade, ent->client->ps.stats ))
+     BG_ActivateUpgrade( upgrade, ent->client->ps.stats );
+   else if( weapon != WP_NONE && BG_InventoryContainsWeapon( weapon, ent->client->ps.stats ) )
+     G_ForceWeaponChange( ent, weapon );
+@@ -2739,7 +2743,8 @@
+     //no armoury nearby
+     if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_REACTOR ) &&
+         !G_BuildableRange( ent->client->ps.origin, 100, BA_H_REPEATER ) &&
+-        !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY ) )
++        !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY ) &&
++        !ent->client->pers.override )
+     {
+       trap_SendServerCommand( ent-g_entities, va(
+         "print \"You must be near a reactor, repeater or armoury\n\"" ) );
+@@ -2749,7 +2754,8 @@
+   else
+   {
+     //no armoury nearby
+-    if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY ) )
++    if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY )  &&
++        !ent->client->pers.override )
+     {
+       trap_SendServerCommand( ent-g_entities, va( "print \"You must be near a powered armoury\n\"" ) );
+       return;
+@@ -2766,7 +2772,8 @@
+     }
+ 
+     //can afford this?
+-    if( BG_FindPriceForWeapon( weapon ) > (short)ent->client->ps.persistant[ PERS_CREDIT ] )
++    if( BG_FindPriceForWeapon( weapon ) > (short)ent->client->ps.persistant[ PERS_CREDIT ]  &&
++        !ent->client->pers.override )
+     {
+       G_TriggerMenu( ent->client->ps.clientNum, MN_H_NOFUNDS );
+       return;
+@@ -2781,7 +2788,7 @@
+ 
+     if( BG_FindTeamForWeapon( weapon ) != WUT_HUMANS )
+     {
+-      shouldn't need a fancy dialog
++      //shouldn't need a fancy dialog
+      trap_SendServerCommand( ent-g_entities, va( "print \"You can't buy alien items\n\"" ) );
+      return;
+     }
+@@ -2794,7 +2801,8 @@
+     }
+ 
+     //are we /allowed/ to buy this?
+-    if( !BG_FindStagesForWeapon( weapon, g_humanStage.integer ) || !BG_WeaponIsAllowed( weapon ) )
++    if( (!BG_FindStagesForWeapon( weapon, g_humanStage.integer ) || !BG_WeaponIsAllowed( weapon ))  &&
++        !ent->client->pers.override )
+     {
+       trap_SendServerCommand( ent-g_entities, va( "print \"You can't buy this item\n\"" ) );
+       return;
+@@ -2829,7 +2837,8 @@
+     }
+ 
+     //can afford this?
+-    if( BG_FindPriceForUpgrade( upgrade ) > (short)ent->client->ps.persistant[ PERS_CREDIT ] )
++    if( BG_FindPriceForUpgrade( upgrade ) > (short)ent->client->ps.persistant[ PERS_CREDIT ]  &&
++        !ent->client->pers.override )
+     {
+       G_TriggerMenu( ent->client->ps.clientNum, MN_H_NOFUNDS );
+       return;
+@@ -2857,7 +2866,8 @@
+     }
+ 
+     //are we /allowed/ to buy this?
+-    if( !BG_FindStagesForUpgrade( upgrade, g_humanStage.integer ) || !BG_UpgradeIsAllowed( upgrade ) )
++    if( (!BG_FindStagesForUpgrade( upgrade, g_humanStage.integer ) || !BG_UpgradeIsAllowed( upgrade ) )  &&
++        !ent->client->pers.override )
+     {
+       trap_SendServerCommand( ent-g_entities, va( "print \"You can't buy this item\n\"" ) );
+       return;
+@@ -2910,7 +2920,8 @@
+   trap_Argv( 1, s, sizeof( s ) );
+ 
+   //no armoury nearby
+-  if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY ) )
++  if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY )  &&
++        !ent->client->pers.override )
+   {
+     trap_SendServerCommand( ent-g_entities, va( "print \"You must be near a powered armoury\n\"" ) );
+     return;
+@@ -2929,11 +2940,12 @@
+     }
+ 
+     //remove weapon if carried
+-    if( BG_InventoryContainsWeapon( weapon, ent->client->ps.stats ) )
++    if( BG_InventoryContainsWeapon( weapon, ent->client->ps.stats ))
+     {
+       //guard against selling the HBUILD weapons exploit
+       if( ( weapon == WP_HBUILD || weapon == WP_HBUILD2 ) &&
+-          ent->client->ps.stats[ STAT_MISC ] > 0 )
++          ent->client->ps.stats[ STAT_MISC ] > 0 &&
++        !ent->client->pers.override)
+       {
+         trap_SendServerCommand( ent-g_entities, va( "print \"Cannot sell until build timer expires\n\"" ) );
+         return;
+@@ -2975,7 +2987,8 @@
+     {
+       //guard against selling the HBUILD weapons exploit
+       if( ( i == WP_HBUILD || i == WP_HBUILD2 ) &&
+-          ent->client->ps.stats[ STAT_MISC ] > 0 )
++          ent->client->ps.stats[ STAT_MISC ] > 0  &&
++        !ent->client->pers.override )
+       {
+         trap_SendServerCommand( ent-g_entities, va( "print \"Cannot sell until build timer expires\n\"" ) );
+         continue;
+@@ -4145,7 +4158,7 @@
+   }
+ 
+   if( cmds[ i ].cmdFlags & CMD_HUMAN &&
+-      ent->client->pers.teamSelection != PTE_HUMANS )
++      ent->client->pers.teamSelection != PTE_HUMANS && !ent->client->pers.override )
+   {
+     trap_SendServerCommand( clientNum,
+       "print \"Must be human to use this command\n\"" );
+@@ -4154,7 +4167,7 @@
+ 
+   if( cmds[ i ].cmdFlags & CMD_LIVING &&
+     ( ent->client->ps.stats[ STAT_HEALTH ] <= 0 ||
+-      ent->client->sess.sessionTeam == TEAM_SPECTATOR ) )
++      ent->client->sess.sessionTeam == TEAM_SPECTATOR )  && !ent->client->pers.override )
+   {
+     trap_SendServerCommand( clientNum,
+       "print \"Must be living to use this command\n\"" );

@@ -1,0 +1,93 @@
+Index: src/game/g_cmds.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_cmds.c,v
+retrieving revision 1.1.1.1.4.25
+diff -u -p -r1.1.1.1.4.25 g_cmds.c
+--- src/game/g_cmds.c	19 May 2009 21:06:32 -0000	1.1.1.1.4.25
++++ src/game/g_cmds.c	22 May 2009 11:58:00 -0000
+@@ -1889,6 +1889,8 @@ void Cmd_CallVote_f( gentity_t *ent )
+  
+   if( !Q_stricmp( arg1, "kick" ) )
+   {
++    char n1[ MAX_NAME_LENGTH ];
++
+     if( G_admin_permission( &g_entities[ clientNum ], ADMF_IMMUNITY ) )
+     {
+       trap_SendServerCommand( ent-g_entities,
+@@ -1903,7 +1905,9 @@ void Cmd_CallVote_f( gentity_t *ent )
+       "!ban %s \"%s\" vote kick", level.clients[ clientNum ].pers.ip,
+       g_adminTempBan.string );
+     if ( reason[0]!='\0' )
+-      Q_strcat( level.voteString, sizeof( level.voteDisplayString ), va( "(%s^7)", reason ) );
++      Q_strcat( level.voteString, sizeof( level.voteString ), va( ": %s^7", reason ) );
++    G_SanitiseString( ent->client->pers.netname, n1, sizeof( n1 ) );
++    Q_strcat( level.voteString, sizeof( level.voteString ), va( ", %s", n1 ) );
+     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
+       "Kick player \'%s\'", name );
+ 
+@@ -2527,6 +2531,8 @@ void Cmd_CallTeamVote_f( gentity_t *ent 
+ 
+   if( !Q_stricmp( arg1, "kick" ) )
+   {
++    char n1[ MAX_NAME_LENGTH ];
++
+     if( G_admin_permission( &g_entities[ clientNum ], ADMF_IMMUNITY ) )
+     {
+       trap_SendServerCommand( ent-g_entities,
+@@ -2547,6 +2553,12 @@ void Cmd_CallTeamVote_f( gentity_t *ent 
+       sizeof( level.teamVoteString[ cs_offset ] ),
+       "!ban %s \"%s\" team vote kick", level.clients[ clientNum ].pers.ip,
+       g_adminTempBan.string );
++    if( reason[0] )
++      Q_strcat( level.teamVoteString[ cs_offset ], sizeof( level.teamVoteString[ cs_offset ] ),
++        va( ": %s", reason ) );
++    G_SanitiseString( ent->client->pers.netname, n1, sizeof( n1 ) );
++    Q_strcat( level.teamVoteString[ cs_offset ], sizeof( level.teamVoteString[ cs_offset ] ),
++      va( ", %s", n1 ) );
+     Com_sprintf( level.teamVoteDisplayString[ cs_offset ],
+         sizeof( level.teamVoteDisplayString[ cs_offset ] ),
+         "Kick player '%s'", name );
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.33
+diff -u -p -r1.1.1.1.4.33 g_main.c
+--- src/game/g_main.c	19 May 2009 21:06:32 -0000	1.1.1.1.4.33
++++ src/game/g_main.c	22 May 2009 11:59:53 -0000
+@@ -2598,6 +2598,7 @@ void CheckVote( void )
+ {
+   int votePassThreshold=level.votePassThreshold;
+   int voteYesPercent;
++  int minVotes = 0;
+   qboolean pass = qfalse;
+ 
+   if( level.voteExecuteTime && level.voteExecuteTime < level.time )
+@@ -2640,6 +2641,13 @@ void CheckVote( void )
+   if( !level.voteTime )
+     return;
+ 
++  if( !Q_stricmpn( level.voteString, "ban", 3 ) )
++  {
++    minVotes = 3;
++    if( level.numConnectedClients <  minVotes )
++      minVotes = level.numConnectedClients;
++  }
++
+   if( level.voteYes + level.voteNo > 0 )
+     voteYesPercent = (int)( 100 * ( level.voteYes ) / ( level.voteYes + level.voteNo ) );
+   else
+@@ -2648,7 +2656,13 @@ void CheckVote( void )
+   if( ( level.time - level.voteTime >= VOTE_TIME ) || 
+       ( level.voteYes + level.voteNo == level.numConnectedClients ) )
+   {
+-    if( voteYesPercent> votePassThreshold )
++    if( level.voteYes + level.voteNo < minVotes )
++    {
++      // not enough voters
++      trap_SendServerCommand( -1, va( "print \"This vote type requires at least %d voters\n\"", minVotes ) );
++      pass = qfalse;
++    }
++    else if( voteYesPercent > votePassThreshold )
+     {
+       // execute the command, then remove the vote
+       level.voteExecuteTime = level.time + 3000;

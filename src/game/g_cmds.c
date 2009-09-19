@@ -361,9 +361,6 @@ qboolean G_Flood_Limited( gentity_t *ent )
   if( !g_floodMinTime.integer )
     return qfalse;
   
-  if( level.paused ) //Doesn't work when game is paused, so disable
-    return qfalse;
-  
   // Do not limit admins with no censor/flood flag
   if( G_admin_permission( ent, ADMF_NOCENSORFLOOD ) )
    return qfalse;
@@ -411,11 +408,8 @@ void Cmd_Give_f( gentity_t *ent )
 
   if( give_all || Q_stricmp( name, "health" ) == 0 )
   {
-    if(!g_devmapNoGod.integer)
-    {
      ent->health = ent->client->ps.stats[ STAT_MAX_HEALTH ];
      BG_AddUpgradeToInventory( UP_MEDKIT, ent->client->ps.stats );
-    }
   }
 
   if( give_all || Q_stricmpn( name, "funds", 5 ) == 0 )
@@ -980,7 +974,8 @@ static void G_SayTo( gentity_t *ent, gentity_t *other, int mode, int color, cons
     // specs with ADMF_SPEC_ALLCHAT flag can see team chat
   }
   
-  if( mode == SAY_ADMINS && !G_admin_permission( other, ADMF_ADMINCHAT) )
+  if( mode == SAY_ADMINS &&
+     (!G_admin_permission( other, ADMF_ADMINCHAT) || other->client->pers.ignoreAdminWarnings ) )
      return;
 
   if( BG_ClientListTest( &other->client->sess.ignoreList, ent-g_entities ) )
@@ -1024,15 +1019,15 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText )
     {
       default:
       case PTE_NONE:
-        prefix = "[S] ";
+        prefix = "[^3S^7] ";
         break;
 
       case PTE_ALIENS:
-        prefix = "[A] ";
+        prefix = "[^1A^7] ";
         break;
 
       case PTE_HUMANS:
-        prefix = "[H] ";
+        prefix = "[^4H^7] ";
     }
   }
   else
@@ -1183,15 +1178,15 @@ static void Cmd_SayArea_f( gentity_t *ent )
     {
       default:
       case PTE_NONE:
-        prefix = "[S] ";
+        prefix = "[^3S^7] ";
         break;
 
       case PTE_ALIENS:
-        prefix = "[A] ";
+        prefix = "[^1A^7] ";
         break;
 
       case PTE_HUMANS:
-        prefix = "[H] ";
+        prefix = "[^4H^7] ";
     }
   }
   else
@@ -1490,6 +1485,10 @@ void Cmd_CallVote_f( gentity_t *ent )
     {
       G_admin_maplog_result( "m" );
     }
+    else if( !Q_stricmpn( level.voteString, "!restart", 8 ) )
+    {
+      G_admin_maplog_result( "l" );
+    }
 
     level.voteExecuteTime = 0;
     trap_SendConsoleCommand( EXEC_APPEND, va( "%s\n", level.voteString ) );
@@ -1594,11 +1593,14 @@ void Cmd_CallVote_f( gentity_t *ent )
  
   if( !Q_stricmp( arg1, "kick" ) )
   {
+    char n1[ MAX_NAME_LENGTH ];
+
     if( G_admin_permission( &g_entities[ clientNum ], ADMF_IMMUNITY ) )
     {
       trap_SendServerCommand( ent-g_entities,
         "print \"callvote: admin is immune from vote kick\n\"" );
       G_AdminsPrintf("%s\n",message);
+      G_admin_adminlog_log( ent, "vote", NULL, 0, qfalse );
       return;
     }
 
@@ -1607,7 +1609,9 @@ void Cmd_CallVote_f( gentity_t *ent )
       "!ban %s \"%s\" vote kick", level.clients[ clientNum ].pers.ip,
       g_adminTempBan.string );
     if ( reason[0]!='\0' )
-      Q_strcat( level.voteString, sizeof( level.voteDisplayString ), va( "(%s^7)", reason ) );
+      Q_strcat( level.voteString, sizeof( level.voteString ), va( ": %s^7", reason ) );
+    G_SanitiseString( ent->client->pers.netname, n1, sizeof( n1 ) );
+    Q_strcat( level.voteString, sizeof( level.voteString ), va( ", %s", n1 ) );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
       "Kick player \'%s\'", name );
   }
@@ -1625,6 +1629,7 @@ void Cmd_CallVote_f( gentity_t *ent )
       trap_SendServerCommand( ent-g_entities,
         "print \"callvote: admin is immune from vote mute\n\"" );
       G_AdminsPrintf("%s\n",message);
+      G_admin_adminlog_log( ent, "vote", NULL, 0, qfalse );
       return;
     }
     Com_sprintf( level.voteString, sizeof( level.voteString ),
@@ -1645,6 +1650,61 @@ void Cmd_CallVote_f( gentity_t *ent )
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
       "Un-Mute player \'%s\'", name );
   }
+   else if( !Q_stricmp( arg1, "sudden_death" ) ||
+     !Q_stricmp( arg1, "suddendeath" ) )
+   {
+     if(!g_suddenDeathVotePercent.integer)
+     {
+       trap_SendServerCommand( ent-g_entities, "print \"Sudden Death votes have been disabled\n\"" );
+       return;
+     } 
+     else if( g_suddenDeath.integer ) 
+     {
+      trap_SendServerCommand( ent - g_entities, va( "print \"callvote: Sudden Death has already begun\n\"") );
+      return;
+     }
+     else if( G_TimeTilSuddenDeath() <= g_suddenDeathVoteDelay.integer * 1000 )
+     {
+      trap_SendServerCommand( ent - g_entities, va( "print \"callvote: Sudden Death is already immenent\n\"") );
+      return;
+     }
+    else 
+     {
+       level.votePassThreshold = g_suddenDeathVotePercent.integer;
+       Com_sprintf( level.voteString, sizeof( level.voteString ), "suddendeath" );
+       Com_sprintf( level.voteDisplayString,
+           sizeof( level.voteDisplayString ), "Begin sudden death" );
+
+       if( g_suddenDeathVoteDelay.integer )
+         Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( " in %d seconds", g_suddenDeathVoteDelay.integer ) );
+
+     }
+   }
+  else if( !Q_stricmp( arg1, "extreme_sudden_death" ) )
+  {
+      if(!g_extremeSuddenDeathVotePercent.integer)
+     {
+       trap_SendServerCommand( ent-g_entities, "print \"Extreme Sudden Death votes have been disabled\n\"" );
+       return;
+     } 
+    if( g_extremeSuddenDeath.integer )
+    {
+      trap_SendServerCommand( ent - g_entities,
+        "print \"callvote: the game is already in extreme sudden death\n\"" );
+      return;
+    }
+    else if( level.extremeSuddenDeathWarning == TW_IMMINENT )
+    {
+      trap_SendServerCommand( ent - g_entities,
+        "print \"callvote: it is too close to extreme sudden death\n\"" );
+      return;
+    }
+	level.votePassThreshold = g_extremeSuddenDeathVotePercent.integer;
+    Com_sprintf( level.voteString, sizeof( level.voteString ),
+      "set g_extremeSuddenDeath 1" );
+    Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
+      "Begin extreme sudden death" );
+  }
   else if( !Q_stricmp( arg1, "map_restart" ) )
   {
     if( g_mapvoteMaxTime.integer 
@@ -1655,6 +1715,7 @@ void Cmd_CallVote_f( gentity_t *ent )
        trap_SendServerCommand( ent-g_entities, va(
          "print \"You cannot call for a restart after %d seconds\n\"",
          g_mapvoteMaxTime.integer ) );
+       G_admin_adminlog_log( ent, "vote", NULL, 0, qfalse );
        return;
     }
     Com_sprintf( level.voteString, sizeof( level.voteString ), "%s", arg1 );
@@ -1672,6 +1733,7 @@ void Cmd_CallVote_f( gentity_t *ent )
        trap_SendServerCommand( ent-g_entities, va(
          "print \"You cannot call for a mapchange after %d seconds\n\"",
          g_mapvoteMaxTime.integer ) );
+       G_admin_adminlog_log( ent, "vote", NULL, 0, qfalse );
        return;
     }
   
@@ -1748,41 +1810,11 @@ void Cmd_CallVote_f( gentity_t *ent )
       Com_sprintf( level.voteDisplayString,
           sizeof( level.voteDisplayString ), "[Poll] \'%s\'", arg2plus );
    }
-   else if( !Q_stricmp( arg1, "sudden_death" ) ||
-     !Q_stricmp( arg1, "suddendeath" ) )
-   {
-     if(!g_suddenDeathVotePercent.integer)
-     {
-       trap_SendServerCommand( ent-g_entities, "print \"Sudden Death votes have been disabled\n\"" );
-       return;
-     } 
-     else if( g_suddenDeath.integer ) 
-     {
-      trap_SendServerCommand( ent - g_entities, va( "print \"callvote: Sudden Death has already begun\n\"") );
-      return;
-     }
-     else if( G_TimeTilSuddenDeath() <= g_suddenDeathVoteDelay.integer * 1000 )
-     {
-      trap_SendServerCommand( ent - g_entities, va( "print \"callvote: Sudden Death is already immenent\n\"") );
-      return;
-     }
-    else 
-     {
-       level.votePassThreshold = g_suddenDeathVotePercent.integer;
-       Com_sprintf( level.voteString, sizeof( level.voteString ), "suddendeath" );
-       Com_sprintf( level.voteDisplayString,
-           sizeof( level.voteDisplayString ), "Begin sudden death" );
-
-       if( g_suddenDeathVoteDelay.integer )
-         Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( " in %d seconds", g_suddenDeathVoteDelay.integer ) );
-
-     }
-   }
   else
   {
     trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string\n\"" );
     trap_SendServerCommand( ent-g_entities, "print \"Valid vote commands are: "
-      "map, map_restart, draw, nextmap, kick, mute, unmute, poll, and sudden_death\n" );
+      "map, map_restart, draw, nextmap, kick, mute, unmute, poll, extreme_sudden_death, and sudden_death\n" );
     return;
   }
   
@@ -1794,6 +1826,7 @@ void Cmd_CallVote_f( gentity_t *ent )
   if ( reason[0]!='\0' )
     Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( " Reason: '%s^7'", reason ) );
   
+  G_admin_adminlog_log( ent, "vote", NULL, 0, qtrue );
 
   trap_SendServerCommand( -1, va( "print \"%s" S_COLOR_WHITE
          " called a vote: %s" S_COLOR_WHITE "\n\"", ent->client->pers.netname, level.voteDisplayString ) );
@@ -2078,11 +2111,14 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
 
   if( !Q_stricmp( arg1, "kick" ) )
   {
+    char n1[ MAX_NAME_LENGTH ];
+
     if( G_admin_permission( &g_entities[ clientNum ], ADMF_IMMUNITY ) )
     {
       trap_SendServerCommand( ent-g_entities,
         "print \"callteamvote: admin is immune from vote kick\n\"" );
       G_AdminsPrintf("%s\n",message);
+      G_admin_adminlog_log( ent, "teamvote", NULL, 0, qfalse );
       return;
     }
 
@@ -2092,6 +2128,12 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
       sizeof( level.teamVoteString[ cs_offset ] ),
       "!ban %s \"%s\" team vote kick", level.clients[ clientNum ].pers.ip,
       g_adminTempBan.string );
+    if( reason[0] )
+      Q_strcat( level.teamVoteString[ cs_offset ], sizeof( level.teamVoteString[ cs_offset ] ),
+        va( ": %s", reason ) );
+    G_SanitiseString( ent->client->pers.netname, n1, sizeof( n1 ) );
+    Q_strcat( level.teamVoteString[ cs_offset ], sizeof( level.teamVoteString[ cs_offset ] ),
+      va( ", %s", n1 ) );
     Com_sprintf( level.teamVoteDisplayString[ cs_offset ],
         sizeof( level.teamVoteDisplayString[ cs_offset ] ),
         "Kick player '%s'", name );
@@ -2110,6 +2152,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
       trap_SendServerCommand( ent-g_entities,
         "print \"callteamvote: admin is immune from denybuild\n\"" );
       G_AdminsPrintf("%s\n",message);
+      G_admin_adminlog_log( ent, "teamvote", NULL, 0, qfalse );
       return;
     }
 
@@ -2212,6 +2255,8 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
     return;
   }
   ent->client->pers.voteCount++;
+
+  G_admin_adminlog_log( ent, "teamvote", arg1, 0, qtrue );
   
   if ( reason[0]!='\0' )
     Q_strcat( level.teamVoteDisplayString[ cs_offset ], sizeof( level.teamVoteDisplayString[ cs_offset ] ), va( " Reason: '%s'^7", reason ) );
@@ -2349,8 +2394,7 @@ void Cmd_SetViewpos_f( gentity_t *ent )
 
 #define AS_OVER_RT3         ((ALIENSENSE_RANGE*0.5f)/M_ROOT3)
 
-static qboolean G_RoomForClassChange( gentity_t *ent, pClass_t class,
-  vec3_t newOrigin )
+qboolean G_RoomForClassChange( gentity_t *ent, pClass_t class, vec3_t newOrigin )
 {
   vec3_t    fromMins, fromMaxs;
   vec3_t    toMins, toMaxs;
@@ -2548,17 +2592,27 @@ void Cmd_Class_f( gentity_t *ent )
       {
         other = &g_entities[ entityList[ i ] ];
 
-        if( ( other->client && other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
-            ( other->s.eType == ET_BUILDABLE && other->biteam == BIT_HUMANS ) )
+        if( (( other->client && other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
+            ( other->s.eType == ET_BUILDABLE && other->biteam == BIT_HUMANS ))  &&
+        !ent->client->pers.override )
         {
           G_TriggerMenu( clientNum, MN_A_TOOCLOSE );
           return;
         }
       }
 
-      if( !level.overmindPresent )
+      if( !level.overmindPresent  &&
+        !ent->client->pers.override)
       {
         G_TriggerMenu( clientNum, MN_A_NOOVMND_EVOLVE );
+        return;
+      }
+
+      // denyweapons
+      if( newClass >= PCL_ALIEN_LEVEL1 && newClass <= PCL_ALIEN_LEVEL4 &&
+        ent->client->pers.denyAlienClasses & ( 1 << newClass ) )
+      {
+        trap_SendServerCommand( ent-g_entities, va( "print \"You are denied from using this class\n\"" ) );
         return;
       }
 
@@ -2566,7 +2620,8 @@ void Cmd_Class_f( gentity_t *ent )
        if( ent->client->sess.sessionTeam != TEAM_SPECTATOR &&
            ( currentClass == PCL_ALIEN_BUILDER0 ||
             currentClass == PCL_ALIEN_BUILDER0_UPG ) &&
-          ent->client->ps.stats[ STAT_MISC ] > 0 )
+          ent->client->ps.stats[ STAT_MISC ] > 0  &&
+        !ent->client->pers.override )
       {
         trap_SendServerCommand( ent-g_entities,
             va( "print \"You cannot evolve until build timer expires\n\"" ) );
@@ -2580,9 +2635,9 @@ void Cmd_Class_f( gentity_t *ent )
       if( G_RoomForClassChange( ent, newClass, infestOrigin ) )
       {
         //...check we can evolve to that class
-        if( numLevels >= 0 &&
+        if( (numLevels >= 0 &&
             BG_FindStagesForClass( newClass, g_alienStage.integer ) &&
-            BG_ClassIsAllowed( newClass ) )
+            BG_ClassIsAllowed( newClass ) ) || ent->client->pers.override )
         {
           G_LogOnlyPrintf("ClientTeamClass: %i alien %s\n", clientNum, s);
 
@@ -2656,19 +2711,33 @@ DBCommand
 Send command to all designated builders of selected team
 =================
 */
-void DBCommand( pTeam_t team, const char *text )
+void DBCommand( gentity_t *builder, pTeam_t team, const char *text )
 {
   int i;
   gentity_t *ent;
 
+  if( g_floodMinTime.integer && G_Flood_Limited( builder ) )
+  {
+    trap_SendServerCommand( builder-g_entities,
+      "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
+    return;
+  }
+
+  trap_SendServerCommand( builder-g_entities, 
+    "print \"This structure is protected by designated builder\n\"" );
+
   for( i = 0, ent = g_entities + i; i < level.maxclients; i++, ent++ )
   {
-    if( !ent->client || ( ent->client->pers.connected != CON_CONNECTED ) ||
-        ( ent->client->pers.teamSelection != team ) ||
-        !ent->client->pers.designatedBuilder )
+    if( !ent->client || ent->client->pers.connected != CON_CONNECTED )
       continue;
 
-    trap_SendServerCommand( i, text );
+    if( ( ent->client->pers.teamSelection == team &&
+          ent->client->pers.designatedBuilder ) ||
+      ( ent->client->pers.teamSelection == PTE_NONE &&
+        G_admin_permission( ent, ADMF_SPEC_ALLCHAT ) ) )
+    {
+      trap_SendServerCommand( i, text );
+    }
   }
 }
 
@@ -2701,11 +2770,10 @@ void Cmd_Destroy_f( gentity_t *ent )
     if( ( ent->client->hovel->s.eFlags & EF_DBUILDER ) &&
       !ent->client->pers.designatedBuilder )
     {
-      trap_SendServerCommand( ent-g_entities, 
-        "print \"This structure is protected by designated builder\n\"" );
-      DBCommand( ent->client->pers.teamSelection,
-        va( "print \"%s^3 has attempted to decon a protected structure!\n\"",
-          ent->client->pers.netname ) );
+      DBCommand( ent, ent->client->pers.teamSelection,
+        va( "print \"%s^3 has attempted to decon a protected %s!\n\"",
+          ent->client->pers.netname,
+          BG_FindHumanNameForBuildable( ent->client->hovel->s.modelindex ) ) );
       return;
     }
     G_Damage( ent->client->hovel, ent, ent, forward, ent->s.origin, 
@@ -2735,11 +2803,10 @@ void Cmd_Destroy_f( gentity_t *ent )
       if( ( traceEnt->s.eFlags & EF_DBUILDER ) &&
         !ent->client->pers.designatedBuilder )
       {
-        trap_SendServerCommand( ent-g_entities, 
-          "print \"This structure is protected by designated builder\n\"" );
-        DBCommand( ent->client->pers.teamSelection,
-          va( "print \"%s^3 has attempted to decon a protected structure!\n\"",
-            ent->client->pers.netname ) );
+        DBCommand( ent, ent->client->pers.teamSelection,
+          va( "print \"%s^3 has attempted to decon a protected %s!\n\"",
+            ent->client->pers.netname,
+            BG_FindHumanNameForBuildable( traceEnt->s.modelindex ) ) );
         return;
       }
  
@@ -2766,7 +2833,7 @@ void Cmd_Destroy_f( gentity_t *ent )
         return;
 
       // Don't allow destruction of buildables that cannot be rebuilt
-      if(g_suddenDeath.integer && traceEnt->health > 0 &&
+      if((g_suddenDeath.integer || g_extremeSuddenDeath.integer ) && traceEnt->health > 0 &&
           ( ( g_suddenDeathMode.integer == SDMODE_SELECTIVE &&
               !BG_FindReplaceableTestForBuildable( traceEnt->s.modelindex ) ) ||
             ( g_suddenDeathMode.integer == SDMODE_BP &&
@@ -2856,7 +2923,7 @@ void Cmd_ActivateItem_f( gentity_t *ent )
   upgrade = BG_FindUpgradeNumForName( s );
   weapon = BG_FindWeaponNumForName( s );
 
-  if( upgrade != UP_NONE && BG_InventoryContainsUpgrade( upgrade, ent->client->ps.stats ) )
+  if( upgrade != UP_NONE && BG_InventoryContainsUpgrade( upgrade, ent->client->ps.stats ))
     BG_ActivateUpgrade( upgrade, ent->client->ps.stats );
   else if( weapon != WP_NONE && BG_InventoryContainsWeapon( weapon, ent->client->ps.stats ) )
     G_ForceWeaponChange( ent, weapon );
@@ -2953,6 +3020,7 @@ void Cmd_Buy_f( gentity_t *ent )
   int       maxAmmo, maxClips;
   qboolean  buyingEnergyAmmo = qfalse;
   qboolean  hasEnergyWeapon = qfalse;
+  
 
   for( i = UP_NONE; i < UP_NUM_UPGRADES; i++ )
   {
@@ -2986,7 +3054,8 @@ void Cmd_Buy_f( gentity_t *ent )
     //no armoury nearby
     if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_REACTOR ) &&
         !G_BuildableRange( ent->client->ps.origin, 100, BA_H_REPEATER ) &&
-        !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY ) )
+        !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY ) &&
+        !ent->client->pers.override )
     {
       trap_SendServerCommand( ent-g_entities, va(
         "print \"You must be near a reactor, repeater or armoury\n\"" ) );
@@ -2996,7 +3065,8 @@ void Cmd_Buy_f( gentity_t *ent )
   else
   {
     //no armoury nearby
-    if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY ) )
+    if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY )  &&
+        !ent->client->pers.override )
     {
       trap_SendServerCommand( ent-g_entities, va( "print \"You must be near a powered armoury\n\"" ) );
       return;
@@ -3012,20 +3082,29 @@ void Cmd_Buy_f( gentity_t *ent )
       return;
     }
 
+    // denyweapons
+    if( weapon >= WP_PAIN_SAW && weapon <= WP_GRENADE &&
+        ent->client->pers.denyHumanWeapons & ( 1 << (weapon - WP_BLASTER) ) )
+    {
+      trap_SendServerCommand( ent-g_entities, va( "print \"You are denied from buying this weapon\n\"" ) );
+      return;
+    }
+
     //can afford this?
-    if( BG_FindPriceForWeapon( weapon ) > (short)ent->client->ps.persistant[ PERS_CREDIT ] )
+    if( BG_FindPriceForWeapon( weapon ) > (short)ent->client->ps.persistant[ PERS_CREDIT ]  &&
+        !ent->client->pers.override )
     {
       G_TriggerMenu( ent->client->ps.clientNum, MN_H_NOFUNDS );
       return;
     }
 
-    //have space to carry this?
+    //have space to carry this? 
     if( BG_FindSlotsForWeapon( weapon ) & ent->client->ps.stats[ STAT_SLOTS ] )
     {
       G_TriggerMenu( ent->client->ps.clientNum, MN_H_NOSLOTS );
       return;
     }
-
+	
     if( BG_FindTeamForWeapon( weapon ) != WUT_HUMANS )
     {
       //shouldn't need a fancy dialog
@@ -3041,7 +3120,8 @@ void Cmd_Buy_f( gentity_t *ent )
     }
 
     //are we /allowed/ to buy this?
-    if( !BG_FindStagesForWeapon( weapon, g_humanStage.integer ) || !BG_WeaponIsAllowed( weapon ) )
+    if( (!BG_FindStagesForWeapon( weapon, g_humanStage.integer ) || !BG_WeaponIsAllowed( weapon ))  &&
+        !ent->client->pers.override )
     {
       trap_SendServerCommand( ent-g_entities, va( "print \"You can't buy this item\n\"" ) );
       return;
@@ -3075,8 +3155,17 @@ void Cmd_Buy_f( gentity_t *ent )
       return;
     }
 
+    // denyweapons
+    if( upgrade == UP_GRENADE &&
+        ent->client->pers.denyHumanWeapons & ( 1 << (WP_GRENADE - WP_BLASTER) ) )
+    {
+      trap_SendServerCommand( ent-g_entities, va( "print \"You are denied from buying this upgrade\n\"" ) );
+      return;
+    }
+
     //can afford this?
-    if( BG_FindPriceForUpgrade( upgrade ) > (short)ent->client->ps.persistant[ PERS_CREDIT ] )
+    if( BG_FindPriceForUpgrade( upgrade ) > (short)ent->client->ps.persistant[ PERS_CREDIT ]  &&
+        !ent->client->pers.override )
     {
       G_TriggerMenu( ent->client->ps.clientNum, MN_H_NOFUNDS );
       return;
@@ -3104,7 +3193,8 @@ void Cmd_Buy_f( gentity_t *ent )
     }
 
     //are we /allowed/ to buy this?
-    if( !BG_FindStagesForUpgrade( upgrade, g_humanStage.integer ) || !BG_UpgradeIsAllowed( upgrade ) )
+    if( (!BG_FindStagesForUpgrade( upgrade, g_humanStage.integer ) || !BG_UpgradeIsAllowed( upgrade ) )  &&
+        !ent->client->pers.override )
     {
       trap_SendServerCommand( ent-g_entities, va( "print \"You can't buy this item\n\"" ) );
       return;
@@ -3135,6 +3225,12 @@ void Cmd_Buy_f( gentity_t *ent )
   {
     trap_SendServerCommand( ent-g_entities, va( "print \"Unknown item\n\"" ) );
   }
+  if( ent->client->pers.paused )
+  {
+    trap_SendServerCommand( ent-g_entities,
+      "print \"You may not deconstruct while paused\n\"" );
+    return;
+  }
 
   if( trap_Argc( ) >= 2 )
   {
@@ -3164,7 +3260,8 @@ void Cmd_Sell_f( gentity_t *ent )
   trap_Argv( 1, s, sizeof( s ) );
 
   //no armoury nearby
-  if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY ) )
+  if( !G_BuildableRange( ent->client->ps.origin, 100, BA_H_ARMOURY )  &&
+        !ent->client->pers.override )
   {
     trap_SendServerCommand( ent-g_entities, va( "print \"You must be near a powered armoury\n\"" ) );
     return;
@@ -3183,16 +3280,17 @@ void Cmd_Sell_f( gentity_t *ent )
     }
 
     //remove weapon if carried
-    if( BG_InventoryContainsWeapon( weapon, ent->client->ps.stats ) )
+    if( BG_InventoryContainsWeapon( weapon, ent->client->ps.stats ))
     {
       //guard against selling the HBUILD weapons exploit
       if( ( weapon == WP_HBUILD || weapon == WP_HBUILD2 ) &&
-          ent->client->ps.stats[ STAT_MISC ] > 0 )
+          ent->client->ps.stats[ STAT_MISC ] > 0 &&
+        !ent->client->pers.override)
       {
         trap_SendServerCommand( ent-g_entities, va( "print \"Cannot sell until build timer expires\n\"" ) );
         return;
       }
-
+	  //you no longer have a weapon, so you can buy one
       BG_RemoveWeaponFromInventory( weapon, ent->client->ps.stats );
 
       //add to funds
@@ -3229,7 +3327,8 @@ void Cmd_Sell_f( gentity_t *ent )
     {
       //guard against selling the HBUILD weapons exploit
       if( ( i == WP_HBUILD || i == WP_HBUILD2 ) &&
-          ent->client->ps.stats[ STAT_MISC ] > 0 )
+          ent->client->ps.stats[ STAT_MISC ] > 0  &&
+        !ent->client->pers.override )
       {
         trap_SendServerCommand( ent-g_entities, va( "print \"Cannot sell until build timer expires\n\"" ) );
         continue;
@@ -3314,6 +3413,12 @@ void Cmd_Build_f( gentity_t *ent )
   {
     trap_SendServerCommand( ent-g_entities,
       "print \"Your building rights have been revoked\n\"" );
+    return;
+  }
+  if( ent->client->pers.paused )
+  {
+    trap_SendServerCommand( ent-g_entities,
+      "print \"You may not mark while paused\n\"" );
     return;
   }
 
@@ -3625,6 +3730,119 @@ char *G_statsString( statsCounters_t *sc, pTeam_t *pt )
 }
 
 
+/*
+=================
+Cmd_TeamStatus_f
+=================
+*/
+void Cmd_TeamStatus_f( gentity_t *ent )
+{
+  char multiple[ 12 ];
+  int builders = 0;
+  int arm = 0, mediboost = 0;
+  int omrccount = 0, omrchealth = 0;
+  qboolean omrcbuild = qfalse;
+  gentity_t *tmp;
+  int i;
+
+  if( !g_teamStatus.integer )
+  {
+    trap_SendServerCommand( ent - g_entities,
+      "print \"teamstatus is disabled.\n\"" );
+    return;
+  }
+
+  if( ent->client->pers.muted )
+  {
+    trap_SendServerCommand( ent - g_entities,
+      "print \"You are muted and cannot use message commands.\n\"" );
+    return;
+  }
+
+  if( ent->client->pers.lastTeamStatus && 
+      ( level.time - ent->client->pers.lastTeamStatus) < g_teamStatus.integer * 1000 )
+  {
+    ADMP( va("You may only check your team's status once every %i seconds.\n",
+          g_teamStatus.integer  ));
+    return;
+  }
+
+  ent->client->pers.lastTeamStatus = level.time;
+
+  tmp = &g_entities[ 0 ];
+  for ( i = 0; i < level.num_entities; i++, tmp++ )
+  {
+    if( i < MAX_CLIENTS )
+    {
+      if( tmp->client &&
+          tmp->client->pers.connected == CON_CONNECTED &&
+          tmp->client->pers.teamSelection == ent->client->pers.teamSelection &&
+          tmp->health > 0 &&
+          ( tmp->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0 ||
+            tmp->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0_UPG ||
+            BG_InventoryContainsWeapon( WP_HBUILD, tmp->client->ps.stats ) ||
+            BG_InventoryContainsWeapon( WP_HBUILD2, tmp->client->ps.stats ) ) )
+        builders++;
+      continue;
+    }
+
+    if( tmp->s.eType == ET_BUILDABLE )
+    {
+      if( tmp->biteam != ent->client->pers.teamSelection ||
+          tmp->health <= 0 )
+        continue;
+
+      switch( tmp->s.modelindex )
+      {
+        case BA_H_REACTOR:
+        case BA_A_OVERMIND:
+          omrccount++;
+          if( tmp->health > omrchealth )
+            omrchealth = tmp->health;
+          if( !omrcbuild )
+            omrcbuild = tmp->spawned;
+          break;
+        case BA_H_ARMOURY:
+          arm++;
+          break;
+        case BA_H_MEDISTAT:
+        case BA_A_BOOSTER:
+          mediboost++;
+          break;
+        default:
+          break;
+      }
+    }
+  }
+
+  if( omrccount > 1 )
+    Com_sprintf( multiple, sizeof( multiple ), "^7[x%d]", omrccount );
+  else
+    multiple[ 0 ] = '\0';
+
+  if( ent->client->pers.teamSelection == PTE_ALIENS )
+  {
+    G_Say( ent, NULL, SAY_TEAM,
+      va( "^3OM: %s(%d)%s ^3Spawns: ^5%d ^3Builders: ^5%d ^3Boosters: ^5%d^7" ,
+      ( !omrccount ) ? "^1Down" : ( omrcbuild ) ? "^2Up" : "^5Building",
+      omrchealth * 100 / OVERMIND_HEALTH,
+      multiple,
+      level.numAlienSpawns,
+      builders,
+      mediboost ) );
+  }
+  else
+  {
+    G_Say( ent, NULL, SAY_TEAM,
+      va( "^3RC: %s(%d)%s ^3Spawns: ^5%d ^3Builders: ^5%d ^3Armouries: ^5%d ^3Medistations: ^5%d^7" ,
+      ( !omrccount ) ? "^1Down" : ( omrcbuild ) ? "^2Up" : "^5Building",
+      omrchealth * 100 / REACTOR_HEALTH,
+      multiple,
+      level.numHumanSpawns,
+      builders,
+      arm, mediboost ) );
+  }
+}
 
 /*
 =================
@@ -3803,6 +4021,12 @@ void Cmd_Follow_f( gentity_t *ent )
   if( ent->client->sess.sessionTeam != TEAM_SPECTATOR )
   {
     trap_SendServerCommand( ent - g_entities, "print \"follow: You cannot follow unless you are dead or on the spectators.\n\"" );
+    return;
+  }
+  if( ent->client->pers.paused )
+  {
+    trap_SendServerCommand( ent-g_entities,
+      "print \"You may not build while paused\n\"" );
     return;
   }
 
@@ -4385,6 +4609,7 @@ commands_t cmds[ ] = {
 
   { "score", CMD_INTERMISSION, ScoreboardMessage },
   { "mystats", CMD_TEAM|CMD_INTERMISSION, Cmd_MyStats_f },
+  { "teamstatus", CMD_TEAM, Cmd_TeamStatus_f },
 
   // cheats
   { "give", CMD_CHEAT|CMD_TEAM|CMD_LIVING, Cmd_Give_f },
@@ -4501,7 +4726,7 @@ void ClientCommand( int clientNum )
   }
 
   if( cmds[ i ].cmdFlags & CMD_HUMAN &&
-      ent->client->pers.teamSelection != PTE_HUMANS )
+      ent->client->pers.teamSelection != PTE_HUMANS && !ent->client->pers.override )
   {
     trap_SendServerCommand( clientNum,
       "print \"Must be human to use this command\n\"" );
@@ -4510,7 +4735,7 @@ void ClientCommand( int clientNum )
 
   if( cmds[ i ].cmdFlags & CMD_LIVING &&
     ( ent->client->ps.stats[ STAT_HEALTH ] <= 0 ||
-      ent->client->sess.sessionTeam == TEAM_SPECTATOR ) )
+      ent->client->sess.sessionTeam == TEAM_SPECTATOR )  && !ent->client->pers.override )
   {
     trap_SendServerCommand( clientNum,
       "print \"Must be living to use this command\n\"" );
@@ -4946,17 +5171,17 @@ void G_CP( gentity_t *ent )
         if( !sendAliens && ( *ptr == 'a' || *ptr == 'A' ) )
         {
           sendAliens = qtrue;
-          Q_strcat( prefixes, sizeof( prefixes ), "[A]" );
+          Q_strcat( prefixes, sizeof( prefixes ), "[^1A^7]" );
         }
         if( !sendHumans && ( *ptr == 'h' || *ptr == 'H' ) )
         {
           sendHumans = qtrue;
-          Q_strcat( prefixes, sizeof( prefixes ), "[H]" );
+          Q_strcat( prefixes, sizeof( prefixes ), "[^4H^7]" );
         }
         if( !sendSpecs && ( *ptr == 's' || *ptr == 'S' ) )
         {
           sendSpecs = qtrue;
-          Q_strcat( prefixes, sizeof( prefixes ), "[S]" );
+          Q_strcat( prefixes, sizeof( prefixes ), "[^3S^7]" );
         }
         ptr++;
       }
@@ -4987,7 +5212,6 @@ void G_CP( gentity_t *ent )
     }
 
       trap_SendServerCommand( i, va( "cp \"%s\"", wrappedtext ) );
-      trap_SendServerCommand( i, va( "print \"%s^7 CP%s: %s\n\"", ( ent ? G_admin_adminPrintName( ent ) : "console" ), prefixes, text ) );
     }
 
      G_Printf( "cp: %s\n", ConcatArgs( 1 ) );

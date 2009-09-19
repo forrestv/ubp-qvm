@@ -1,0 +1,107 @@
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.7
+diff -u -p -r1.1.1.1.4.7 g_admin.c
+--- src/game/g_admin.c	17 Feb 2009 04:42:46 -0000	1.1.1.1.4.7
++++ src/game/g_admin.c	17 Feb 2009 04:48:15 -0000
+@@ -95,6 +95,12 @@ g_admin_cmd_t g_admin_cmds[ ] = 
+       "(-AHS) [^3message^7]"
+     },
+ 
++    {"demo", G_admin_demo, "?",
++      "turn admin chat off for the caller so it does not appear in demos. "
++      "this is a toggle use !demo again to turn warnings back on",
++      ""
++    },
++
+     {"denybuild", G_admin_denybuild, "d",
+       "take away a player's ability to build",
+       "[^3name|slot#^7]"
+@@ -3529,6 +3535,22 @@ qboolean G_admin_layoutsave( gentity_t *
+   return qtrue;
+ }
+ 
++qboolean G_admin_demo( gentity_t *ent, int skiparg )
++{
++  if( !ent )
++  {
++    ADMP( "!demo: console can not use demo.\n");
++    return qfalse;
++  }
++
++  ent->client->pers.ignoreAdminWarnings = !( ent->client->pers.ignoreAdminWarnings );
++
++  ADMP( va( "^3!demo: ^7your visibility of admin chat is now %s\n",
++    ( ent->client->pers.ignoreAdminWarnings ) ? "^1disabled" : "^2enabled" ) );
++
++  return qtrue;
++}
++
+ qboolean G_admin_mute( gentity_t *ent, int skiparg )
+ {
+   int pids[ MAX_CLIENTS ];
+Index: src/game/g_admin.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.h,v
+retrieving revision 1.1.1.1.4.5
+diff -u -p -r1.1.1.1.4.5 g_admin.h
+--- src/game/g_admin.h	17 Feb 2009 04:42:46 -0000	1.1.1.1.4.5
++++ src/game/g_admin.h	17 Feb 2009 04:44:20 -0000
+@@ -213,6 +213,7 @@ qboolean G_admin_devmap( gentity_t *ent,
+ void G_admin_maplog_update( void );
+ qboolean G_admin_maplog( gentity_t *ent, int skiparg );
+ qboolean G_admin_layoutsave( gentity_t *ent, int skiparg );
++qboolean G_admin_demo( gentity_t *ent, int skiparg );
+ qboolean G_admin_mute( gentity_t *ent, int skiparg );
+ qboolean G_admin_denybuild( gentity_t *ent, int skiparg );
+ qboolean G_admin_denyweapon( gentity_t *ent, int skiparg );
+Index: src/game/g_cmds.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_cmds.c,v
+retrieving revision 1.1.1.1.4.5
+diff -u -p -r1.1.1.1.4.5 g_cmds.c
+--- src/game/g_cmds.c	17 Feb 2009 04:42:46 -0000	1.1.1.1.4.5
++++ src/game/g_cmds.c	17 Feb 2009 04:44:20 -0000
+@@ -980,7 +980,8 @@ static void G_SayTo( gentity_t *ent, gen
+     // specs with ADMF_SPEC_ALLCHAT flag can see team chat
+   }
+   
+-  if( mode == SAY_ADMINS && !G_admin_permission( other, ADMF_ADMINCHAT) )
++  if( mode == SAY_ADMINS &&
++     (!G_admin_permission( other, ADMF_ADMINCHAT) || other->client->pers.ignoreAdminWarnings ) )
+      return;
+ 
+   if( BG_ClientListTest( &other->client->sess.ignoreList, ent-g_entities ) )
+Index: src/game/g_local.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_local.h,v
+retrieving revision 1.1.1.1.4.5
+diff -u -p -r1.1.1.1.4.5 g_local.h
+--- src/game/g_local.h	17 Feb 2009 04:42:46 -0000	1.1.1.1.4.5
++++ src/game/g_local.h	17 Feb 2009 04:44:20 -0000
+@@ -408,6 +408,7 @@ typedef struct
+   char                guid[ 33 ];
+   char                ip[ 16 ];
+   qboolean            muted;
++  qboolean            ignoreAdminWarnings;
+   qboolean            denyBuild;
+   int                 denyHumanWeapons;
+   int                 denyAlienClasses;
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.7
+diff -u -p -r1.1.1.1.4.7 g_main.c
+--- src/game/g_main.c	17 Feb 2009 04:35:55 -0000	1.1.1.1.4.7
++++ src/game/g_main.c	17 Feb 2009 04:44:20 -0000
+@@ -1801,7 +1801,8 @@ void QDECL G_AdminsPrintf( const char *f
+   for( j = 0; j < level.maxclients; j++ )
+   {
+     tempent = &g_entities[ j ];
+-    if( G_admin_permission( tempent, ADMF_ADMINCHAT) ) 
++    if( G_admin_permission( tempent, ADMF_ADMINCHAT) &&
++        !tempent->client->pers.ignoreAdminWarnings ) 
+     {
+        trap_SendServerCommand(tempent-g_entities,va( "print \"^6[Admins]^7 %s\"", string) ); 
+     }

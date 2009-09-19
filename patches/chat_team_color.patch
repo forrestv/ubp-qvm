@@ -1,0 +1,66 @@
+Index: src/game/g_cmds.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_cmds.c,v
+retrieving revision 1.1.1.1.4.18
+diff -u -p -r1.1.1.1.4.18 g_cmds.c
+--- src/game/g_cmds.c	17 Feb 2009 20:12:37 -0000	1.1.1.1.4.18
++++ src/game/g_cmds.c	17 Feb 2009 20:15:22 -0000
+@@ -1053,15 +1053,15 @@ void G_Say( gentity_t *ent, gentity_t *t
+     {
+       default:
+       case PTE_NONE:
+-        prefix = "[S] ";
++        prefix = "[^3S^7] ";
+         break;
+ 
+       case PTE_ALIENS:
+-        prefix = "[A] ";
++        prefix = "[^1A^7] ";
+         break;
+ 
+       case PTE_HUMANS:
+-        prefix = "[H] ";
++        prefix = "[^4H^7] ";
+     }
+   }
+   else
+@@ -1212,15 +1212,15 @@ static void Cmd_SayArea_f( gentity_t *en
+     {
+       default:
+       case PTE_NONE:
+-        prefix = "[S] ";
++        prefix = "[^3S^7] ";
+         break;
+ 
+       case PTE_ALIENS:
+-        prefix = "[A] ";
++        prefix = "[^1A^7] ";
+         break;
+ 
+       case PTE_HUMANS:
+-        prefix = "[H] ";
++        prefix = "[^4H^7] ";
+     }
+   }
+   else
+@@ -5698,17 +5698,17 @@ void G_CP( gentity_t *ent )
+         if( *ptr == 'a' || *ptr == 'A' )
+         {
+           sendAliens = qtrue;
+-          Q_strcat( prefixes, sizeof( prefixes ), "[A]" );
++          Q_strcat( prefixes, sizeof( prefixes ), "[^1A^7]" );
+         }
+         if( *ptr == 'h' || *ptr == 'H' )
+         {
+           sendHumans = qtrue;
+-          Q_strcat( prefixes, sizeof( prefixes ), "[H]" );
++          Q_strcat( prefixes, sizeof( prefixes ), "[^4H^7]" );
+         }
+         if( *ptr == 's' || *ptr == 'S' )
+         {
+           sendSpecs = qtrue;
+-          Q_strcat( prefixes, sizeof( prefixes ), "[S]" );
++          Q_strcat( prefixes, sizeof( prefixes ), "[^3S^7]" );
+         }
+         ptr++;
+       }

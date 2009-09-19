@@ -1,0 +1,44 @@
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.25
+diff -u -p -r1.1.1.1.4.25 g_admin.c
+--- src/game/g_admin.c	17 Feb 2009 20:24:22 -0000	1.1.1.1.4.25
++++ src/game/g_admin.c	17 Feb 2009 20:26:14 -0000
+@@ -5332,7 +5332,7 @@ qboolean G_admin_showbans( gentity_t *en
+ qboolean G_admin_help( gentity_t *ent, int skiparg )
+ {
+   int i;
+-  char additional[ MAX_STRING_CHARS ] = "\nThe following non-standard /commands may also be available to you: \n^3";
++  char additional[ MAX_STRING_CHARS ] = "";
+ 
+   if( G_SayArgc() < 2 + skiparg )
+   {
+@@ -5370,6 +5370,8 @@ qboolean G_admin_help( gentity_t *ent, i
+       }
+     }
+     
++    if( ent && g_markDeconstruct.integer == 2 )
++      strcat( additional, " /mark" );
+     if( ent )
+       strcat( additional, " /builder /say_area" );
+     if( g_publicSayadmins.integer || G_admin_permission( ent, ADMF_ADMINCHAT ) )
+@@ -5380,6 +5382,8 @@ qboolean G_admin_help( gentity_t *ent, i
+       strcat( additional, " /me /mt /me_team" );
+     if( ent && g_myStats.integer )
+       strcat( additional, " /mystats" );
++    if( ent && g_teamStatus.integer )
++      strcat( additional, " /teamstatus" );
+     if( ent && ent->client )
+     {
+       if( ent->client->pers.designatedBuilder )
+@@ -5394,7 +5398,8 @@ qboolean G_admin_help( gentity_t *ent, i
+       ADMBP( "\n" );
+     ADMBP( va( "^3!help: ^7%i available commands\n", count ) );
+     ADMBP( "run !help [^3command^7] for help with a specific command.\n" );
+-    ADMBP( va( "%s\n", additional ) );
++    ADMBP( va( "\nThe following non-standard /commands may also be available to you: \n^3%s\n",
++      additional ) );
+     ADMBP_end();
+     
+     return qtrue;

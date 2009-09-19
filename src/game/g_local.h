@@ -403,20 +403,28 @@ typedef struct
   int                 credit;
   int                 ping;
 
+  int                 lastTeamStatus;
+
   int                 lastFloodTime;         // level.time of last flood-limited command
   int                 floodDemerits;         // number of flood demerits accumulated
 
   vec3_t              lastDeathLocation;
   char                guid[ 33 ];
   char                ip[ 16 ];
+  qboolean            paused;
   qboolean            muted;
+  qboolean            ignoreAdminWarnings;
   qboolean            denyBuild;
+  qboolean            override;
+  int                 denyHumanWeapons;
+  int                 denyAlienClasses;
   int                 adminLevel;
   char                adminName[ MAX_NETNAME ];
   qboolean            designatedBuilder;
   qboolean            firstConnect;        // This is the first map since connect
   qboolean            useUnlagged;
   statsCounters_t     statscounters;
+  int                 bubbleTime;
 } clientPersistant_t;
 
 #define MAX_UNLAGGED_MARKERS 10
@@ -732,6 +740,7 @@ typedef struct
   qboolean          suddenDeath;
   int               suddenDeathBeginTime;
   timeWarning_t     suddenDeathWarning;
+  timeWarning_t     extremeSuddenDeathWarning;
   timeWarning_t     timelimitWarning;
 
   spawnQueue_t      alienSpawnQueue;
@@ -746,8 +755,16 @@ typedef struct
   qboolean          uncondHumanWin;
   qboolean          alienTeamLocked;
   qboolean          humanTeamLocked;
-  qboolean paused;
-  int pausedTime;
+  qboolean          paused;
+  int               pauseTime;
+  float             pause_speed;
+  float             pause_gravity;
+  float             pause_knockback;
+  int               pause_ff;
+  int               pause_ffb;
+
+  int               lastCreditedAlien;
+  int               lastCreditedHuman;
 
   int unlaggedIndex;
   int unlaggedTimes[ MAX_UNLAGGED_MARKERS ];
@@ -796,6 +813,7 @@ char      *G_NewString( const char *string );
 // g_cmds.c
 //
 void      Cmd_Score_f( gentity_t *ent );
+qboolean  G_RoomForClassChange( gentity_t *ent, pClass_t class, vec3_t newOrigin );
 void      G_StopFromFollowing( gentity_t *ent );
 void      G_StopFollowing( gentity_t *ent );
 qboolean  G_FollowNewClient( gentity_t *ent, int dir );
@@ -946,6 +964,7 @@ qboolean  G_RadiusDamage( vec3_t origin, gentity_t *attacker, float damage, floa
                           gentity_t *ignore, int mod );
 qboolean  G_SelectiveRadiusDamage( vec3_t origin, gentity_t *attacker, float damage, float radius,
                                    gentity_t *ignore, int mod, int team );
+void      G_Knockback( gentity_t *targ, vec3_t dir, int knockback );
 void      body_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath );
 void      AddScore( gentity_t *ent, int score );
 
@@ -1083,6 +1102,7 @@ void CheckVote( void );
 void CheckTeamVote( int teamnum );
 void LogExit( const char *string );
 int  G_TimeTilSuddenDeath( void );
+int  G_TimeTilExtremeSuddenDeath( void );
 void CheckMsgTimer( void );
 qboolean G_Flood_Limited( gentity_t *ent );
 
@@ -1246,6 +1266,8 @@ extern  vmCvar_t  g_timelimit;
 extern  vmCvar_t  g_suddenDeathTime;
 extern  vmCvar_t  g_suddenDeath;
 extern  vmCvar_t  g_suddenDeathMode;
+extern  vmCvar_t  g_extremeSuddenDeathTime;
+extern  vmCvar_t  g_extremeSuddenDeath;
 extern  vmCvar_t  g_friendlyFire;
 extern  vmCvar_t  g_friendlyFireHumans;
 extern  vmCvar_t  g_friendlyFireAliens;
@@ -1275,6 +1297,7 @@ extern  vmCvar_t  g_requireVoteReasons;
 extern  vmCvar_t  g_voteLimit;
 extern  vmCvar_t  g_suddenDeathVotePercent;
 extern  vmCvar_t  g_suddenDeathVoteDelay;
+extern  vmCvar_t  g_extremeSuddenDeathVotePercent;
 extern  vmCvar_t  g_mapVotesPercent;
 extern  vmCvar_t  g_designateVotes;
 extern  vmCvar_t  g_teamAutoJoin;
@@ -1287,6 +1310,7 @@ extern  vmCvar_t  pmove_fixed;
 extern  vmCvar_t  pmove_msec;
 extern  vmCvar_t  g_rankings;
 extern  vmCvar_t  g_allowShare;
+extern  vmCvar_t  g_creditOverflow;
 extern  vmCvar_t  g_enableDust;
 extern  vmCvar_t  g_enableBreath;
 extern  vmCvar_t  g_singlePlayer;
@@ -1345,11 +1369,15 @@ extern  vmCvar_t  g_minLevelToSpecMM1;
 extern  vmCvar_t  g_banNotice;
 
 extern  vmCvar_t  g_devmapKillerHP;
+extern  vmCvar_t  g_killerHP;
+
+extern  vmCvar_t  g_maxGhosts;
 
 extern  vmCvar_t  g_privateMessages;
 extern  vmCvar_t  g_decolourLogfiles;
 extern  vmCvar_t  g_publicSayadmins;
 extern  vmCvar_t  g_myStats;
+extern  vmCvar_t  g_teamStatus;
 extern  vmCvar_t  g_antiSpawnBlock;
 
 extern  vmCvar_t  g_dretchPunt;
@@ -1357,12 +1385,19 @@ extern  vmCvar_t  g_dretchPunt;
 extern  vmCvar_t  g_devmapNoGod;
 extern  vmCvar_t  g_devmapNoStructDmg;
 
+extern  vmCvar_t  g_slapKnockback;
+extern  vmCvar_t  g_slapDamage;
+
 extern  vmCvar_t  g_voteMinTime;
 extern  vmCvar_t  g_mapvoteMaxTime;
 extern  vmCvar_t  g_votableMaps;
 
 extern  vmCvar_t  g_msg;
 extern  vmCvar_t  g_msgTime;
+extern  vmCvar_t  g_welcomeMsg;
+extern  vmCvar_t  g_welcomeMsgTime;
+
+extern  vmCvar_t  g_freeCredits;
 
 extern  vmCvar_t  g_buildLogMaxLength;
 

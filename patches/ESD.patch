@@ -1,0 +1,263 @@
+Index: src/game/g_local.h
+===================================================================
+--- src/game/g_local.h	(revision 894)
++++ src/game/g_local.h	(working copy)
+@@ -633,6 +633,7 @@
+   pTeam_t           lastWin;
+ 
+   timeWarning_t     suddenDeathWarning;
++  timeWarning_t     extremeSuddenDeathWarning;
+   timeWarning_t     timelimitWarning;
+ 
+   spawnQueue_t      alienSpawnQueue;
+@@ -928,6 +929,7 @@
+ void CheckTeamVote( int teamnum );
+ void LogExit( const char *string );
+ int  G_TimeTilSuddenDeath( void );
++int  G_TimeTilExtremeSuddenDeath( void );
+ 
+ //
+ // g_client.c
+@@ -1084,6 +1086,9 @@
+ 
+ extern  vmCvar_t  g_timelimit;
+ extern  vmCvar_t  g_suddenDeathTime;
++extern  vmCvar_t  g_suddenDeath;
++extern  vmCvar_t  g_extremeSuddenDeathTime;
++extern  vmCvar_t  g_extremeSuddenDeath;
+ extern  vmCvar_t  g_friendlyFire;
+ extern  vmCvar_t  g_friendlyFireHumans;
+ extern  vmCvar_t  g_friendlyFireAliens;
+Index: src/game/g_active.c
+===================================================================
+--- src/game/g_active.c	(revision 894)
++++ src/game/g_active.c	(working copy)
+@@ -1676,7 +1676,7 @@
+   // Give clients some credit periodically
+   if( ent->client->lastKillTime + FREEKILL_PERIOD < level.time )
+   {
+-    if( G_TimeTilSuddenDeath( ) <= 0 )
++    if( g_suddenDeath.integer || g_extremeSuddenDeath.integer )
+     {
+       //gotta love logic like this eh?
+     }
+Index: src/game/g_main.c
+===================================================================
+--- src/game/g_main.c	(revision 894)
++++ src/game/g_main.c	(working copy)
+@@ -42,6 +42,9 @@
+ vmCvar_t  g_fraglimit;
+ vmCvar_t  g_timelimit;
+ vmCvar_t  g_suddenDeathTime;
++vmCvar_t  g_suddenDeath;
++vmCvar_t  g_extremeSuddenDeathTime;
++vmCvar_t  g_extremeSuddenDeath;
+ vmCvar_t  g_capturelimit;
+ vmCvar_t  g_friendlyFire;
+ vmCvar_t  g_friendlyFireAliens;
+@@ -153,6 +156,9 @@
+   // change anytime vars
+   { &g_timelimit, "timelimit", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
+   { &g_suddenDeathTime, "g_suddenDeathTime", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
++  { &g_suddenDeath, "g_suddenDeath", "0", 0, 0, qfalse },
++  { &g_extremeSuddenDeathTime, "g_extremeSuddenDeathTime", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
++  { &g_extremeSuddenDeath, "g_extremeSuddenDeath", "0", 0, 0, qfalse },
+ 
+   { &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
+ 
+@@ -627,6 +633,8 @@
+   trap_Cvar_Set( "g_humanStage", va( "%d", S1 ) );
+   trap_Cvar_Set( "g_alienKills", 0 );
+   trap_Cvar_Set( "g_humanKills", 0 );
++  trap_Cvar_Set( "g_suddenDeath", 0 );
++  trap_Cvar_Set( "g_extremeSuddenDeath", 0 );
+ 
+   G_Printf( "-----------------------------------\n" );
+ 
+@@ -1006,7 +1014,20 @@
+          ( level.time - level.startTime );
+ }
+ 
++/*
++============
++G_TimeTilExtremeSuddenDeath
++============
++*/
++int G_TimeTilExtremeSuddenDeath( void )
++{
++	  if( !g_extremeSuddenDeathTime.integer )
++		      return 1; // Always some time away
+ 
++	    return ( g_extremeSuddenDeathTime.integer * 60000 ) -
++		             ( level.time - level.startTime );
++}
++
+ #define PLAYER_COUNT_MOD 5.0f
+ 
+ /*
+@@ -1024,31 +1045,61 @@
+   int         localHTP = g_humanBuildPoints.integer,
+               localATP = g_alienBuildPoints.integer;
+ 
+-  if( g_suddenDeathTime.integer && !level.warmupTime )
++  if( g_suddenDeath.integer )
+   {
+-    if( G_TimeTilSuddenDeath( ) <= 0 )
++    localHTP = 0;
++    localATP = 0;
++
++    //warn about sudden death
++    if( level.suddenDeathWarning < TW_PASSED )
+     {
+-      localHTP = 0;
+-      localATP = 0;
+-
+-      //warn about sudden death
+-      if( level.suddenDeathWarning < TW_PASSED )
+-      {
+-        trap_SendServerCommand( -1, "cp \"Sudden Death!\"" );
+-        level.suddenDeathWarning = TW_PASSED;
+-      }
++      trap_SendServerCommand( -1, "cp \"Sudden Death!\"" );
++      level.suddenDeathWarning = TW_PASSED;
+     }
+-    else
++  }
++  else if( g_suddenDeathTime.integer && !level.warmupTime )
++  {
++    //warn about sudden death
++    if( G_TimeTilSuddenDeath( ) <= 60000 &&
++        level.suddenDeathWarning < TW_IMMINENT )
+     {
+-      //warn about sudden death
+-      if( G_TimeTilSuddenDeath( ) <= 60000 &&
+-          level.suddenDeathWarning < TW_IMMINENT )
+-      {
+-        trap_SendServerCommand( -1, "cp \"Sudden Death in 1 minute!\"" );
+-        level.suddenDeathWarning = TW_IMMINENT;
+-      }
++      trap_SendServerCommand( -1, "cp \"Sudden Death in 1 minute!\"" );
++      level.suddenDeathWarning = TW_IMMINENT;
+     }
++    else if( G_TimeTilSuddenDeath( ) <= 0 )
++        trap_Cvar_Set( "g_suddenDeath", "1" );
+   }
++  if( g_extremeSuddenDeath.integer )
++  {
++    localHTP = 0;
++    localATP = 0;
++    //warn about extreme sudden death
++    if( level.extremeSuddenDeathWarning < TW_PASSED )
++    {
++      trap_SendConsoleCommand( EXEC_NOW, "alienWin\n" );
++      trap_SendConsoleCommand( EXEC_NOW, "humanWin\n" );
++      if( g_alienStage.integer < 2 )
++          trap_SendConsoleCommand( EXEC_NOW, "g_alienStage 2\n" );
++      if( g_humanStage.integer < 2 )
++          trap_SendConsoleCommand( EXEC_NOW, "g_humanStage 2\n" );
++      for( i = 0; i < MAX_CLIENTS; i++ )
++          level.clients[i].ps.persistant[PERS_CREDIT] = 2000;
++      trap_SendServerCommand( -1, "cp \"Extreme Sudden Death!\"" );
++      level.extremeSuddenDeathWarning = TW_PASSED;
++    }
++  }
++  else if( g_extremeSuddenDeathTime.integer && !level.warmupTime )
++  {
++    //warn about extreme sudden death
++    if( G_TimeTilExtremeSuddenDeath( ) <= 60000 &&
++        level.extremeSuddenDeathWarning < TW_IMMINENT )
++    {
++      trap_SendServerCommand( -1, "cp \"Extreme Sudden Death in 1 minute!\"" );
++      level.suddenDeathWarning = TW_IMMINENT;
++    }
++    else if( G_TimeTilSuddenDeath( ) <= 0 )
++        trap_Cvar_Set( "g_extremeSuddenDeath", "1" );
++  }
+   else
+   {
+     localHTP = g_humanBuildPoints.integer;
+@@ -1603,7 +1654,7 @@
+   }
+ 
+   Com_sprintf( data, BIG_INFO_STRING,
+-      "%s %s T:%c A:%f H:%f M:%s D:%d SD:%d AS:%d AS2T:%d AS3T:%d HS:%d HS2T:%d HS3T:%d CL:%d",
++      "%s %s T:%c A:%f H:%f M:%s D:%d SD:%d ESD: %d AS:%d AS2T:%d AS3T:%d HS:%d HS2T:%d HS3T:%d CL:%d",
+       Q3_VERSION,
+       g_tag.string,
+       teamChar,
+@@ -1612,6 +1663,7 @@
+       map,
+       level.time - level.startTime,
+       G_TimeTilSuddenDeath( ),
++      G_TimeTilExtremeSuddenDeath( ),
+       g_alienStage.integer,
+       level.alienStage2Time - level.startTime,
+       level.alienStage3Time - level.startTime,
+Index: src/game/g_cmds.c
+===================================================================
+--- src/game/g_cmds.c	(revision 894)
++++ src/game/g_cmds.c	(working copy)
+@@ -1104,6 +1104,44 @@
+     else
+       return;
+   }
++  else if( !Q_stricmp( arg1, "sudden_death" ) )
++  {
++    if( g_suddenDeath.integer )
++    {
++      trap_SendServerCommand( ent - g_entities,
++        "print \"callvote: the game is already in sudden death\n\"" );
++      return;
++    }
++    else if( level.suddenDeathWarning == TW_IMMINENT )
++    {
++      trap_SendServerCommand( ent - g_entities,
++        "print \"callvote: it is too close to sudden death\n\"" );
++      return;
++    }
++    Com_sprintf( level.voteString, sizeof( level.voteString ),
++      "set g_suddenDeath 1" );
++    Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
++      "Begin sudden death" );
++  }
++  else if( !Q_stricmp( arg1, "extreme_sudden_death" ) )
++  {
++    if( g_extremeSuddenDeath.integer )
++    {
++      trap_SendServerCommand( ent - g_entities,
++        "print \"callvote: the game is already in extreme sudden death\n\"" );
++      return;
++    }
++    else if( level.extremeSuddenDeathWarning == TW_IMMINENT )
++    {
++      trap_SendServerCommand( ent - g_entities,
++        "print \"callvote: it is too close to extreme sudden death\n\"" );
++      return;
++    }
++    Com_sprintf( level.voteString, sizeof( level.voteString ),
++      "set g_extremeSuddenDeath 1" );
++    Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
++      "Begin extreme sudden death" );
++  }
+   else if( !Q_stricmp( arg1, "map_restart" ) )
+   {
+     Com_sprintf( level.voteString, sizeof( level.voteString ), "%s", arg1 );
+@@ -1133,7 +1171,8 @@
+   {
+     trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string\n\"" );
+     trap_SendServerCommand( ent-g_entities, "print \"Valid vote commands are: map_restart, nextmap, "
+-                                            "map <mapname>, kick <player>, clientkick <clientnum>\n\"" );
++                                            "map <mapname>, extreme_sudden_death, sudden_death, "
++                                            "kick <player>, clientkick <clientnum>\n\"" );
+     return;
+   }
+ 
+@@ -1755,7 +1794,7 @@
+         return;
+ 
+       // Don't allow destruction of buildables that cannot be rebuilt
+-      if( G_TimeTilSuddenDeath( ) <= 0 &&
++      if( ( g_suddenDeath.integer || g_extremeSuddenDeath.integer ) &&
+           BG_FindBuildPointsForBuildable( traceEnt->s.modelindex ) )
+       {
+         return;

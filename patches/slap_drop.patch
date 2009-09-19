@@ -1,0 +1,347 @@
+Index: src/game/bg_public.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/bg_public.h,v
+retrieving revision 1.1.1.1.4.2
+diff -u -p -r1.1.1.1.4.2 bg_public.h
+--- src/game/bg_public.h	17 Feb 2009 14:55:14 -0000	1.1.1.1.4.2
++++ src/game/bg_public.h	17 Feb 2009 19:58:18 -0000
+@@ -892,7 +892,8 @@ typedef enum
+ 
+   MOD_ASPAWN,
+   MOD_ATUBE,
+-  MOD_OVERMIND
++  MOD_OVERMIND,
++  MOD_SLAP
+ } meansOfDeath_t;
+ 
+ 
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.22
+diff -u -p -r1.1.1.1.4.22 g_admin.c
+--- src/game/g_admin.c	17 Feb 2009 18:41:11 -0000	1.1.1.1.4.22
++++ src/game/g_admin.c	17 Feb 2009 19:58:18 -0000
+@@ -121,6 +121,11 @@ g_admin_cmd_t g_admin_cmds[ ] = 
+       "[^3mapname^7] (^5layout^7)"
+     },
+ 
++    {"drop", G_admin_drop, "X",
++      "kick a client from the server without log",
++      "[^3name|slot#^7] [^3message^7]"
++    },
++
+     {"expire", G_admin_expire, "G",
+       "Expires up to 5 level 1 admins with !seen times older than g_adminExpireTime",
+       "[^5confirm^7]"
+@@ -297,6 +302,11 @@ g_admin_cmd_t g_admin_cmds[ ] = 
+       "(^5start at ban#^7) (^5name|IP|'-subnet'^7)"
+     },
+ 
++    {"slap", G_admin_slap, "x",
++      "Do damage to a player, and send them flying",
++      "[^3name|slot^7] (damage)"
++    },
++
+     {"spec999", G_admin_spec999, "P",
+       "move 999 pingers to the spectator team",
+       ""},
+@@ -6857,6 +6867,139 @@ qboolean G_admin_outlaw( gentity_t *ent,
+   return qtrue;
+ }
+ 
++qboolean G_admin_slap( gentity_t *ent, int skiparg )
++{
++  int pids[ MAX_CLIENTS ];
++  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
++  gentity_t *vic;
++  vec3_t dir;
++
++  if( level.intermissiontime ) return qfalse;
++
++  if( G_SayArgc() < 2 + skiparg )
++  {
++    ADMP( "^3!slap: ^7usage: !slap [name|slot#]\n" );
++    return qfalse;
++  }
++
++  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
++  if( G_ClientNumbersFromString( name, pids ) != 1 )
++  {
++    G_MatchOnePlayer( pids, err, sizeof( err ) );
++    ADMP( va( "^3!slap: ^7%s\n", err ) );
++    return qfalse;
++  }
++
++  vic = &g_entities[ pids[ 0 ] ];
++  if( !vic )
++  {
++    ADMP( "^3!slap: ^7bad target\n" );
++    return qfalse;
++  }
++  if( vic == ent )
++  {
++    ADMP( "^3!slap: ^7sorry, you cannot slap yourself\n" );
++    return qfalse;
++  }
++  if( !admin_higher( ent, vic ) )
++  {
++    ADMP( "^3!slap: ^7sorry, but your intended victim has a higher admin"
++          " level than you\n" );
++    return qfalse;
++  }
++  if( vic->client->pers.teamSelection == PTE_NONE ||
++      vic->client->pers.classSelection == PCL_NONE )
++  {
++    ADMP( "^3!slap: ^7can't slap spectators\n" );
++    return qfalse;
++  }
++
++  // knockback in a random direction
++  dir[0] = crandom();
++  dir[1] = crandom();
++  dir[2] = random();
++  G_Knockback( vic, dir, g_slapKnockback.integer );
++
++  trap_SendServerCommand( vic-g_entities,
++    va( "cp \"%s^7 is not amused\n\"",
++        ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
++
++  if( g_slapDamage.integer > 0 )
++  {
++    int damage;
++
++    if( G_SayArgc() > 2 + skiparg )
++    {
++      char dmg_str[ MAX_STRING_CHARS ];
++      G_SayArgv( 2 + skiparg, dmg_str, sizeof( dmg_str ) );
++      damage = atoi(dmg_str);
++      if( damage < 0 ) damage = 0;
++    }
++    else
++    {
++      if( g_slapDamage.integer > 100 ) g_slapDamage.integer = 100;
++      damage = BG_FindHealthForClass( vic->client->ps.stats[ STAT_PCLASS ] ) *
++        g_slapDamage.integer / 100;
++      if( damage < 1 ) damage = 1;
++    }
++
++    vic->health -= damage;
++    vic->client->ps.stats[ STAT_HEALTH ] = vic->health;
++    vic->lastDamageTime = level.time;
++    if( vic->health <= 0 )
++    {
++      vic->flags |= FL_NO_KNOCKBACK;
++      vic->enemy = &g_entities[ pids[ 0 ] ];
++      vic->die( vic, ent, ent, damage, MOD_SLAP );
++    }
++    else if( vic->pain )
++    {
++      vic->pain( vic, &g_entities[ pids[ 0 ] ], damage );
++    }
++  }
++  return qtrue;
++}
++
++qboolean G_admin_drop( gentity_t *ent, int skiparg )
++{
++  int pids[ MAX_CLIENTS ];
++  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
++
++  if( G_SayArgc() < 2 + skiparg )
++  {
++    ADMP( "^3!drop: ^7usage: !drop [name|slot#] [message]\n" );
++    return qfalse;
++  }
++
++  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
++  if( G_ClientNumbersFromString( name, pids ) != 1 )
++  {
++    G_MatchOnePlayer( pids, err, sizeof( err ) );
++    ADMP( va( "^3!drop: ^7%s\n", err ) );
++    return qfalse;
++  }
++
++  if( !admin_higher( ent, &g_entities[ pids[ 0 ] ] ) )
++  {
++    ADMP( "^3!drop: ^7sorry, but your intended victim has a higher admin"
++          " level than you\n" );
++    return qfalse;
++  }
++
++  // victim's message
++  if( G_SayArgc() > 2 + skiparg )
++    trap_SendServerCommand( pids[ 0 ],
++      va( "disconnect \"You have been dropped.\n%s^7\n\"",
++      G_SayConcatArgs( 2 + skiparg ) ) );
++  else
++    trap_SendServerCommand( pids[ 0 ], va( "disconnect" ) );
++
++  // server message
++  trap_DropClient( pids[ 0 ], va( "disconnected" ) );
++
++  return qtrue;
++}
++
+ qboolean G_admin_buildlog( gentity_t *ent, int skiparg )
+ {
+ #define LOG_DISPLAY_LENGTH 10
+Index: src/game/g_admin.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.h,v
+retrieving revision 1.1.1.1.4.12
+diff -u -p -r1.1.1.1.4.12 g_admin.h
+--- src/game/g_admin.h	17 Feb 2009 17:10:43 -0000	1.1.1.1.4.12
++++ src/game/g_admin.h	17 Feb 2009 19:58:18 -0000
+@@ -263,6 +263,9 @@ qboolean G_admin_flag( gentity_t *ent, i
+ qboolean G_admin_immunity( gentity_t *ent, int skiparg );
+ qboolean G_admin_cp( gentity_t *ent, int skiparg );
+ 
++qboolean G_admin_slap( gentity_t *ent, int skiparg );
++qboolean G_admin_drop( gentity_t *ent, int skiparg );
++
+ void G_admin_print( gentity_t *ent, char *m );
+ void G_admin_buffer_print( gentity_t *ent, char *m );
+ void G_admin_buffer_begin( void );
+Index: src/game/g_combat.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_combat.c,v
+retrieving revision 1.1.1.1.4.9
+diff -u -p -r1.1.1.1.4.9 g_combat.c
+--- src/game/g_combat.c	17 Feb 2009 19:57:17 -0000	1.1.1.1.4.9
++++ src/game/g_combat.c	17 Feb 2009 19:58:18 -0000
+@@ -117,7 +117,8 @@ char *modNames[ ] =
+ 
+   "MOD_ASPAWN",
+   "MOD_ATUBE",
+-  "MOD_OVERMIND"
++  "MOD_OVERMIND",
++  "MOD_SLAP"
+ };
+ 
+ /*
+@@ -216,6 +217,14 @@ void player_die( gentity_t *self, gentit
+   }
+   self->client->pers.statscounters.spreekills = 0;
+ 
++  if( meansOfDeath == MOD_SLAP )
++  {
++    trap_SendServerCommand( -1,
++      va( "print \"%s^7 felt %s^7's authority\n\"",
++      self->client->pers.netname, killerName ) );
++    goto finish_dying;
++  }
++
+   // broadcast the death event to everyone
+   if( !tk )
+   {
+@@ -642,6 +651,8 @@ void player_die( gentity_t *self, gentit
+       ScoreboardMessage( g_entities + i );
+   }
+ 
++finish_dying: // from MOD_SLAP
++
+   VectorCopy( self->s.origin, self->client->pers.lastDeathLocation );
+ 
+   self->takedamage = qfalse; // can still be gibbed
+@@ -1902,3 +1913,48 @@ qboolean G_RadiusDamage( vec3_t origin, 
+ 
+   return hitClient;
+ }
++
++/*
++============
++G_Knockback
++============
++*/
++void G_Knockback( gentity_t *targ, vec3_t dir, int knockback )
++{
++  if( knockback && targ->client )
++  {
++    vec3_t  kvel;
++    float   mass;
++
++    mass = 200;
++
++    // Halve knockback for bsuits
++    if( targ->client &&
++        targ->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS &&
++        BG_InventoryContainsUpgrade( UP_BATTLESUIT, targ->client->ps.stats ) )
++      mass += 400;
++
++    // Halve knockback for crouching players
++    if(targ->client->ps.pm_flags&PMF_DUCKED) knockback /= 2;
++
++    VectorScale( dir, g_knockback.value * (float)knockback / mass, kvel );
++    VectorAdd( targ->client->ps.velocity, kvel, targ->client->ps.velocity );
++
++    // set the timer so that the other client can't cancel
++    // out the movement immediately
++    if( !targ->client->ps.pm_time )
++    {
++      int   t;
++
++      t = knockback * 2;
++      if( t < 50 )
++        t = 50;
++
++      if( t > 200 )
++        t = 200;
++      targ->client->ps.pm_time = t;
++      targ->client->ps.pm_flags |= PMF_TIME_KNOCKBACK;
++    }
++  }
++}
++
+Index: src/game/g_local.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_local.h,v
+retrieving revision 1.1.1.1.4.23
+diff -u -p -r1.1.1.1.4.23 g_local.h
+--- src/game/g_local.h	17 Feb 2009 19:57:17 -0000	1.1.1.1.4.23
++++ src/game/g_local.h	17 Feb 2009 19:58:18 -0000
+@@ -993,6 +993,7 @@ qboolean  G_RadiusDamage( vec3_t origin,
+                           gentity_t *ignore, int mod );
+ qboolean  G_SelectiveRadiusDamage( vec3_t origin, gentity_t *attacker, float damage, float radius,
+                                    gentity_t *ignore, int mod, int team );
++void      G_Knockback( gentity_t *targ, vec3_t dir, int knockback );
+ void      body_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int meansOfDeath );
+ void      AddScore( gentity_t *ent, int score );
+ 
+@@ -1457,6 +1458,9 @@ extern  vmCvar_t  g_dretchPunt;
+ extern  vmCvar_t  g_devmapNoGod;
+ extern  vmCvar_t  g_devmapNoStructDmg;
+ 
++extern  vmCvar_t  g_slapKnockback;
++extern  vmCvar_t  g_slapDamage;
++
+ extern  vmCvar_t  g_voteMinTime;
+ extern  vmCvar_t  g_mapvoteMaxTime;
+ 
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.25
+diff -u -p -r1.1.1.1.4.25 g_main.c
+--- src/game/g_main.c	17 Feb 2009 19:57:17 -0000	1.1.1.1.4.25
++++ src/game/g_main.c	17 Feb 2009 19:58:18 -0000
+@@ -217,6 +217,9 @@ vmCvar_t  g_creditOverflow;
+ vmCvar_t  g_devmapNoGod;
+ vmCvar_t  g_devmapNoStructDmg;
+ 
++vmCvar_t  g_slapKnockback;
++vmCvar_t  g_slapDamage;
++
+ vmCvar_t  g_voteMinTime;
+ vmCvar_t  g_mapvoteMaxTime;
+ 
+@@ -285,6 +288,9 @@ static cvarTable_t   gameCvarTable[ ] =
+   { &g_devmapNoGod, "g_devmapNoGod", "0", CVAR_ARCHIVE, 0, qtrue  },
+   { &g_devmapNoStructDmg, "g_devmapNoStructDmg", "0", CVAR_ARCHIVE, 0, qtrue  },
+ 
++  { &g_slapKnockback, "g_slapKnockback", "200", CVAR_ARCHIVE, 0, qfalse},
++  { &g_slapDamage, "g_slapDamage", "5", CVAR_ARCHIVE, 0, qfalse},
++
+   { &g_teamAutoJoin, "g_teamAutoJoin", "0", CVAR_ARCHIVE  },
+   { &g_teamForceBalance, "g_teamForceBalance", "1", CVAR_ARCHIVE  },
+ 

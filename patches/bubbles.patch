@@ -1,0 +1,118 @@
+Index: src/game/g_active.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_active.c,v
+retrieving revision 1.1.1.1.4.8
+diff -u -p -r1.1.1.1.4.8 g_active.c
+--- src/game/g_active.c	17 Feb 2009 18:41:11 -0000	1.1.1.1.4.8
++++ src/game/g_active.c	17 Feb 2009 20:20:22 -0000
+@@ -1648,6 +1648,15 @@ void ClientThink_real( gentity_t *ent )
+ 
+   client->ps.gravity = g_gravity.value;
+ 
++  if( client->pers.bubbleTime && client->pers.bubbleTime < level.time )
++  {
++    gentity_t *bubble;
++
++    client->pers.bubbleTime = level.time + 500;
++    bubble = G_TempEntity( client->ps.origin, EV_PLAYER_TELEPORT_OUT );
++    bubble->s.clientNum = ent->s.clientNum;
++  }
++
+   if( BG_InventoryContainsUpgrade( UP_MEDKIT, client->ps.stats ) &&
+       BG_UpgradeIsActive( UP_MEDKIT, client->ps.stats ) )
+   {
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.24
+diff -u -p -r1.1.1.1.4.24 g_admin.c
+--- src/game/g_admin.c	17 Feb 2009 20:06:52 -0000	1.1.1.1.4.24
++++ src/game/g_admin.c	17 Feb 2009 20:20:22 -0000
+@@ -83,6 +83,11 @@ g_admin_cmd_t g_admin_cmds[ ] = 
+       "[^3name|slot#^7]"
+     },
+ 
++    {"bubble", G_admin_bubble, "q",
++      "draw attention to a player with bubbles",
++      "[^3name|slot#^7]"
++    },
++
+     {"buildlog", G_admin_buildlog, "U",
+       "display a list of recent builds and deconstructs, optionally specifying"
+       " a team",
+@@ -7041,6 +7046,45 @@ qboolean G_admin_drop( gentity_t *ent, i
+   return qtrue;
+ }
+ 
++qboolean G_admin_bubble( gentity_t *ent, int skiparg )
++{
++  int pids[ MAX_CLIENTS ];
++  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
++  gentity_t *vic;
++
++  if( G_SayArgc() < 2 + skiparg )
++  {
++    ADMP( "^3!bubble: ^7usage: !bubble [name|slot#]\n" );
++    return qfalse;
++  }
++  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
++  if( G_ClientNumbersFromString( name, pids ) != 1 )
++  {
++    G_MatchOnePlayer( pids, err, sizeof( err ) );
++    ADMP( va( "^3!bubble: ^7%s\n", err ) );
++    return qfalse;
++  }
++  if( !admin_higher( ent, &g_entities[ pids[ 0 ] ] ) )
++  {
++    ADMP( "^3!bubble: ^7sorry, but your intended victim has a higher admin"
++        " level than you\n" );
++    return qfalse;
++  }
++
++  vic = &g_entities[ pids[ 0 ] ];
++  if( vic->client->pers.bubbleTime )
++    vic->client->pers.bubbleTime = 0;
++  else
++    vic->client->pers.bubbleTime = level.time + 500;
++
++  AP( va( "print \"^3!bubble: ^7bubbles %s for %s^7 by %s\n\"",
++    ( vic->client->pers.bubbleTime ) ? "enabled" : "disabled",
++    vic->client->pers.netname,
++    ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
++
++  return qtrue;
++}
++
+ qboolean G_admin_buildlog( gentity_t *ent, int skiparg )
+ {
+ #define LOG_DISPLAY_LENGTH 10
+Index: src/game/g_admin.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.h,v
+retrieving revision 1.1.1.1.4.14
+diff -u -p -r1.1.1.1.4.14 g_admin.h
+--- src/game/g_admin.h	17 Feb 2009 20:06:52 -0000	1.1.1.1.4.14
++++ src/game/g_admin.h	17 Feb 2009 20:20:22 -0000
+@@ -266,6 +266,7 @@ qboolean G_admin_cp( gentity_t *ent, int
+ 
+ qboolean G_admin_slap( gentity_t *ent, int skiparg );
+ qboolean G_admin_drop( gentity_t *ent, int skiparg );
++qboolean G_admin_bubble( gentity_t *ent, int skiparg );
+ 
+ void G_admin_print( gentity_t *ent, char *m );
+ void G_admin_buffer_print( gentity_t *ent, char *m );
+Index: src/game/g_local.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_local.h,v
+retrieving revision 1.1.1.1.4.25
+diff -u -p -r1.1.1.1.4.25 g_local.h
+--- src/game/g_local.h	17 Feb 2009 20:12:38 -0000	1.1.1.1.4.25
++++ src/game/g_local.h	17 Feb 2009 20:20:22 -0000
+@@ -429,6 +429,7 @@ typedef struct
+   qboolean            designatedBuilder;
+   char                chat[ CHAT_MAXCHAN ][ CHAT_MAXPASS ];
+   int                 karma;
++  int                 bubbleTime;
+   qboolean            firstConnect;        // This is the first map since connect
+   qboolean            useUnlagged;
+   statsCounters_t     statscounters;

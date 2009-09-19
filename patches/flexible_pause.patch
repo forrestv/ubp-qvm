@@ -1,0 +1,546 @@
+Index: src/game/g_active.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_active.c,v
+retrieving revision 1.1.1.1.4.7
+diff -u -p -r1.1.1.1.4.7 g_active.c
+--- src/game/g_active.c	17 Feb 2009 17:31:27 -0000	1.1.1.1.4.7
++++ src/game/g_active.c	17 Feb 2009 18:18:16 -0000
+@@ -925,6 +925,7 @@ void ClientTimerActions( gentity_t *ent,
+       }
+ 
+       if( ent->health > 0 && ent->health < client->ps.stats[ STAT_MAX_HEALTH ] &&
++          !level.paused &&
+           ( ent->lastDamageTime + ALIEN_REGEN_DAMAGE_TIME ) < level.time )
+       {
+         float dist_mod = 1.0f;
+@@ -1500,6 +1501,7 @@ void ClientThink_real( gentity_t *ent )
+   int       oldEventSequence;
+   int       msec;
+   usercmd_t *ucmd;
++  int       real_pm_type;
+ 
+   client = ent->client;
+ 
+@@ -1510,6 +1512,9 @@ void ClientThink_real( gentity_t *ent )
+   // mark the time, so the connection sprite can be removed
+   ucmd = &ent->client->pers.cmd;
+ 
++  if( client->pers.paused )
++    ucmd->forwardmove = ucmd->rightmove = ucmd->upmove = ucmd->buttons = 0;
++
+   // sanity check the command time to prevent speedup cheating
+   if( ucmd->serverTime > level.time + 200 )
+   {
+@@ -1611,6 +1616,10 @@ void ClientThink_real( gentity_t *ent )
+   else
+     client->ps.pm_type = PM_NORMAL;
+ 
++  // paused
++  real_pm_type = client->ps.pm_type;
++  if ( level.paused ) client->ps.pm_type = PM_SPECTATOR;
++
+   if( client->ps.stats[ STAT_STATE ] & SS_GRABBED &&
+       client->grabExpiryTime < level.time )
+     client->ps.stats[ STAT_STATE ] &= ~SS_GRABBED;
+@@ -1649,7 +1658,7 @@ void ClientThink_real( gentity_t *ent )
+     {
+       BG_DeactivateUpgrade( UP_MEDKIT, client->ps.stats );
+     }
+-    else if( client->ps.stats[ STAT_HEALTH ] > 0 )
++    else if( client->ps.stats[ STAT_HEALTH ] > 0 && !level.paused )
+     {
+       //remove anti toxin
+       BG_DeactivateUpgrade( UP_MEDKIT, client->ps.stats );
+@@ -1687,6 +1696,9 @@ void ClientThink_real( gentity_t *ent )
+   // set speed
+   client->ps.speed = g_speed.value * BG_FindSpeedForClass( client->ps.stats[ STAT_PCLASS ] );
+ 
++  if( client->pers.paused )
++    client->ps.speed = 0;
++
+   if( client->lastCreepSlowTime + CREEP_TIMEOUT < level.time )
+     client->ps.stats[ STAT_STATE ] &= ~SS_CREEPSLOWED;
+ 
+@@ -1777,6 +1789,8 @@ void ClientThink_real( gentity_t *ent )
+   if( ent->client->ps.eventSequence != oldEventSequence )
+     ent->eventTime = level.time;
+ 
++  if ( level.paused ) client->ps.pm_type = real_pm_type;
++
+   if( g_smoothClients.integer )
+     BG_PlayerStateToEntityStateExtraPolate( &ent->client->ps, &ent->s, ent->client->ps.commandTime, qtrue );
+   else
+Index: src/game/g_admin.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_admin.c,v
+retrieving revision 1.1.1.1.4.21
+diff -u -p -r1.1.1.1.4.21 g_admin.c
+--- src/game/g_admin.c	17 Feb 2009 18:08:26 -0000	1.1.1.1.4.21
++++ src/game/g_admin.c	17 Feb 2009 18:23:59 -0000
+@@ -234,8 +234,9 @@ g_admin_cmd_t g_admin_cmds[ ] = 
+     },
+     
+     {"pause", G_admin_pause, "S",
+-      "Pause (or unpause) the game.",
+-      ""
++      "prevent a player from interacting with the game."
++      "  * will pause all players, using no argument will pause game clock",
++      "(^5name|slot|*^7)"
+     },
+ 
+     {"practice", G_admin_practice, "[",
+@@ -357,6 +358,12 @@ g_admin_cmd_t g_admin_cmds[ ] = 
+       "[^3name|slot#^7]"
+     },
+ 
++    {"unpause", G_admin_pause, "S",
++      "allow a player to interact with the game."
++      "  * will unpause all players, using no argument will unpause game clock",
++      "(^5name|slot|*^7)"
++    },
++
+     {
+      "warn", G_admin_warn, "w",
+       "Warn a player to cease or face admin intervention",
+@@ -4774,6 +4781,12 @@ qboolean G_admin_listplayers( gentity_t 
+       Q_strncpyz( immune, "I", sizeof( immune ) );
+     }
+ 
++    if( p->pers.paused )
++    {
++      // use immunity slot for paused player status
++      Q_strncpyz( immune, "L", sizeof( immune ) );
++    }
++
+     l = 0;
+     G_SanitiseString( p->pers.netname, n2, sizeof( n2 ) );
+     n[ 0 ] = '\0';
+@@ -5538,24 +5551,163 @@ qboolean G_admin_passvote( gentity_t *en
+   return qtrue;
+ }
+ 
++static qboolean G_admin_global_pause( gentity_t *ent, int skiparg )
++{
++  if( level.paused )
++  {
++    level.pauseTime = level.time;
++    ADMP( "^3!pause: ^7Game is already paused, unpause timer reset\n" );
++    return qfalse;
++  }
++
++  level.paused = qtrue;
++  level.pauseTime = level.time;
++
++  level.pause_speed = g_speed.value;
++  level.pause_gravity = g_gravity.value;
++  level.pause_knockback = g_knockback.value;
++  level.pause_ff = g_friendlyFire.integer;
++  level.pause_ffb = g_friendlyBuildableFire.integer;
++
++  g_speed.value = 0;
++  g_gravity.value = 0;
++  g_knockback.value = 0;
++  g_friendlyFire.integer = 0;
++  g_friendlyBuildableFire.integer = 0;
++
++  CP( "cp \"^1Game is PAUSED\"" );
++  AP( va( "print \"^3!pause: ^7The game has been paused by %s\n\"",
++    ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
++
++  return qtrue;
++}
++
++static qboolean G_admin_global_unpause( gentity_t *ent, int skiparg )
++{
++  if( !level.paused )
++  {
++    ADMP( "^3!unpause: ^7Game is not paused\n" );
++    return qfalse;
++  }
++
++  level.paused = qfalse;
++
++  g_speed.value = level.pause_speed;
++  g_gravity.value = level.pause_gravity;
++  g_knockback.value = level.pause_knockback;
++  g_friendlyFire.integer = level.pause_ff;
++  g_friendlyBuildableFire.integer = level.pause_ffb;
++
++  CP( "cp \"^2Game is RESUMED\"" );
++  AP( va( "print \"^3!unpause: ^7The game has been resumed by %s\n\"",
++    ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
++
++  return qtrue;
++}
++
+ qboolean G_admin_pause( gentity_t *ent, int skiparg )
+ {
+-    if(!level.paused) 
++  int pids[ MAX_CLIENTS ];
++  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
++  char command[ MAX_ADMIN_CMD_LEN ], *cmd;
++  int i;
++  int count = 0;
++  gentity_t *vic;
++
++  G_SayArgv( skiparg, command, sizeof( command ) );
++  cmd = command;
++  if( cmd && *cmd == '!' )
++    cmd++;
++
++  if( G_SayArgc() < 2 + skiparg )
++  {
++    // global pause
++    if( !Q_stricmp( cmd, "pause" ) )
++      return G_admin_global_pause( ent, skiparg );
++    else
++      return G_admin_global_unpause( ent, skiparg );
++  }
++  if( G_SayArgc() != 2 + skiparg )
++  {
++    ADMP( va( "^3!%s: ^7usage: !%s (^5name|slot|*^7)\n", cmd, cmd ) );
++    return qfalse;
++  }
++
++  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
++  if( !Q_stricmp( name, "*" ) )
++  {
++    for( i = 0; i < MAX_CLIENTS; i++ )
+     {
+-      AP( va( "print \"^3!pause: ^7%s^7 paused the game.\n\"", ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
+-      level.paused = qtrue;
+-      trap_SendServerCommand( -1, "cp \"The game has been paused. Please wait.\"" );
++      vic = &g_entities[ i ];
++      if( vic && vic->client &&
++          vic->client->pers.connected == CON_CONNECTED )
++      {
++        pids[ count ] = i;
++        count++;
++      }
+     }
+-    else
++  }
++  else
++  {
++    if( G_ClientNumbersFromString( name, pids ) != 1 )
+     {
+-      // Prevent accidental pause->unpause race conditions by two admins doing !pause at once
+-      if( level.pausedTime < 1000 ) return qfalse;
++      G_MatchOnePlayer( pids, err, sizeof( err ) );
++      ADMP( va( "^3!%s: ^7%s\n", cmd, err ) );
++      return qfalse;
++    }
++    count = 1;
++  }
+ 
+-      AP( va( "print \"^3!pause: ^7%s^7 unpaused the game (Paused for %d msec) \n\"", ( ent ) ? G_admin_adminPrintName( ent ) : "console",level.pausedTime ) );
+-      trap_SendServerCommand( -1, "cp \"The game has been unpaused!\"" );
+-      level.paused = qfalse;
++  for( i = 0; i < count; i++ )
++  {
++    vic = &g_entities[ pids[ i ] ];
++    if ( !vic || !vic->client ) continue;
++    if( !admin_higher( ent, vic ) )
++    {
++      if( count == 1 )
++        ADMP( va( "^3!%s: ^7sorry, but your intended victim has a higher admin"
++                    " level than you\n", cmd ) );
++      continue;
+     }
+-    return qtrue;
++    if( vic->client->pers.paused )
++    {
++      if( !Q_stricmp( cmd, "pause" ) )
++      {
++        if( count == 1 )
++          ADMP( "^3!pause: ^7player is already paused\n" );
++        continue;
++      }
++      vic->client->pers.paused = qfalse;
++      CPx( pids[ i ], "cp \"^2You've been unpaused\"" );
++      if( count == 1 )
++        AP( va( "print \"^3!unpause: ^7%s^7 unpaused by %s\n\"",
++            vic->client->pers.netname,
++            ( ent ) ? ent->client->pers.netname : "console" ) );
++    }
++    else
++    {
++      if( !Q_stricmp( cmd, "unpause" ) )
++      {
++        if( count == 1 )
++          ADMP( "^3!unpause: ^7player is already unpaused\n" );
++        continue;
++      }
++      if( count == 1 && ent == vic)
++      {
++        ADMP( "^3!pause: ^7you can not pause yourself\n" );
++        continue;
++      }
++      vic->client->pers.paused = qtrue;
++      CPx( pids[ i ], va( "cp \"^1You've been paused by ^7%s\"",
++          ( ent ) ? ent->client->pers.netname : "console" ) );
++      if( count == 1 )
++        AP( va( "print \"^3!pause: ^7%s^7 paused by %s\n\"",
++            vic->client->pers.netname,
++            ( ent ) ? ent->client->pers.netname : "console" ) );
++    }
++    ClientUserinfoChanged( pids[ i ] );
++  }
++  return qtrue;
+ }
+ 
+ qboolean G_admin_practice( gentity_t *ent, int skiparg )
+@@ -6560,6 +6712,12 @@ qboolean G_admin_putmespec( gentity_t *e
+     ADMP( "!specme: sorry, but console isn't allowed on the spectators team\n");
+     return qfalse;
+   }
++
++  if( level.paused )
++  {
++    ADMP("!specme: disabled when game is paused\n");
++    return qfalse;
++  }
+   
+   if(ent->client->pers.teamSelection == PTE_NONE)
+     return qfalse;
+Index: src/game/g_buildable.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_buildable.c,v
+retrieving revision 1.1.1.1.4.5
+diff -u -p -r1.1.1.1.4.5 g_buildable.c
+--- src/game/g_buildable.c	17 Feb 2009 17:10:43 -0000	1.1.1.1.4.5
++++ src/game/g_buildable.c	17 Feb 2009 18:18:16 -0000
+@@ -1118,6 +1118,8 @@ void AAcidTube_Think( gentity_t *self )
+       if( enemy->client &&
+           ( enemy->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS || enemy->client->pers.bleeder ) )
+       {
++        if( level.paused || enemy->client->pers.paused )
++          continue;
+         self->timestamp = level.time;
+         self->think = AAcidTube_Damage;
+         self->nextthink = level.time + 100;
+@@ -1192,6 +1194,8 @@ void AHive_Think( gentity_t *self )
+ 
+       if( enemy->client && enemy->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
+       {
++        if( level.paused || enemy->client->pers.paused )
++          continue;
+         self->active = qtrue;
+         self->target_ent = enemy;
+         self->timestamp = level.time + HIVE_REPEAT;
+@@ -1827,6 +1831,8 @@ void HReactor_Think( gentity_t *self )
+ 
+       if( enemy->client && enemy->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
+       {
++        if( level.paused || enemy->client->pers.paused )
++          continue;
+         self->timestamp = level.time;
+         G_SelectiveRadiusDamage( self->s.pos.trBase, self, rc_damage,
+           rc_range, self, MOD_REACTOR, PTE_HUMANS );
+@@ -2196,6 +2202,9 @@ qboolean HMGTurret_CheckTarget( gentity_
+   if( !target->client )
+     return qfalse;
+ 
++  if( level.paused || target->client->pers.paused )
++    return qfalse;
++
+   if( target->client->ps.stats[ STAT_STATE ] & SS_HOVELING )
+     return qfalse;
+ 
+@@ -2417,6 +2426,7 @@ void HTeslaGen_Think( gentity_t *self )
+       if( enemy->client &&
+           ( enemy->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS || enemy->client->pers.bleeder ) &&
+           enemy->health > 0 &&
++          !level.paused && !enemy->client->pers.paused &&
+           Distance( enemy->s.pos.trBase, self->s.pos.trBase ) <= TESLAGEN_RANGE )
+       {
+         VectorSubtract( enemy->s.pos.trBase, self->s.pos.trBase, dir );
+@@ -2745,7 +2755,7 @@ void G_BuildableThink( gentity_t *ent, i
+   //pack health, power and dcc
+ 
+   //toggle spawned flag for buildables
+-  if( !ent->spawned && ent->health > 0 && !level.pausedTime )
++  if( !ent->spawned && ent->health > 0 )
+   {
+     if( ent->buildTime + bTime < level.time )
+       ent->spawned = qtrue;
+Index: src/game/g_cmds.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_cmds.c,v
+retrieving revision 1.1.1.1.4.15
+diff -u -p -r1.1.1.1.4.15 g_cmds.c
+--- src/game/g_cmds.c	17 Feb 2009 17:31:27 -0000	1.1.1.1.4.15
++++ src/game/g_cmds.c	17 Feb 2009 18:18:16 -0000
+@@ -361,9 +361,6 @@ qboolean G_Flood_Limited( gentity_t *ent
+   if( !g_floodMinTime.integer )
+     return qfalse;
+   
+-  if( level.paused ) //Doesn't work when game is paused, so disable
+-    return qfalse;
+-  
+   // Do not limit admins with no censor/flood flag
+   if( G_admin_permission( ent, ADMF_NOCENSORFLOOD ) )
+    return qfalse;
+@@ -3154,6 +3151,12 @@ void Cmd_Destroy_f( gentity_t *ent )
+       "print \"Your building rights have been revoked\n\"" );
+     return;
+   }
++  if( ent->client->pers.paused )
++  {
++    trap_SendServerCommand( ent-g_entities,
++      "print \"You may not deconstruct while paused\n\"" );
++    return;
++  }
+ 
+   if( g_newbieNoBuild.integer
+     && g_newbieNamePrefix.string[ 0 ]
+@@ -3331,6 +3334,12 @@ void Cmd_Mark_f( gentity_t *ent )
+       "print \"Your building rights have been revoked\n\"" );
+     return;
+   }
++  if( ent->client->pers.paused )
++  {
++    trap_SendServerCommand( ent-g_entities,
++      "print \"You may not mark while paused\n\"" );
++    return;
++  }
+ 
+   if( g_newbieNoBuild.integer
+     && g_newbieNamePrefix.string[ 0 ]
+@@ -3900,6 +3909,12 @@ void Cmd_Build_f( gentity_t *ent )
+       "print \"Your building rights have been revoked\n\"" );
+     return;
+   }
++  if( ent->client->pers.paused )
++  {
++    trap_SendServerCommand( ent-g_entities,
++      "print \"You may not build while paused\n\"" );
++    return;
++  }
+ 
+   if( g_newbieNoBuild.integer
+     && g_newbieNamePrefix.string[ 0 ]
+Index: src/game/g_combat.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_combat.c,v
+retrieving revision 1.1.1.1.4.7
+diff -u -p -r1.1.1.1.4.7 g_combat.c
+--- src/game/g_combat.c	17 Feb 2009 17:31:27 -0000	1.1.1.1.4.7
++++ src/game/g_combat.c	17 Feb 2009 18:18:16 -0000
+@@ -1254,6 +1254,9 @@ void G_Damage( gentity_t *targ, gentity_
+   if( !attacker )
+     attacker = &g_entities[ ENTITYNUM_WORLD ];
+ 
++  if( attacker->client && attacker->client->pers.paused )
++    return;
++
+   // shootable doors / buttons don't actually have any health
+   if( targ->s.eType == ET_MOVER )
+   {
+@@ -1270,6 +1273,8 @@ void G_Damage( gentity_t *targ, gentity_
+   {
+     if( client->noclip && !g_devmapNoGod.integer)
+       return;
++    if( client->pers.paused )
++      return;
+   }
+ 
+   if( !dir )
+@@ -1403,6 +1408,9 @@ void G_Damage( gentity_t *targ, gentity_
+     // check for godmode
+     if ( targ->flags & FL_GODMODE && !g_devmapNoGod.integer)
+       return;
++
++    if( level.paused )
++      return;
+     
+     if(targ->s.eType == ET_BUILDABLE && g_cheats.integer && g_devmapNoStructDmg.integer)
+       return;
+Index: src/game/g_local.h
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_local.h,v
+retrieving revision 1.1.1.1.4.20
+diff -u -p -r1.1.1.1.4.20 g_local.h
+--- src/game/g_local.h	17 Feb 2009 17:31:27 -0000	1.1.1.1.4.20
++++ src/game/g_local.h	17 Feb 2009 18:18:16 -0000
+@@ -416,6 +416,7 @@ typedef struct
+   vec3_t              lastDeathLocation;
+   char                guid[ 33 ];
+   char                ip[ 16 ];
++  qboolean            paused;
+   qboolean            muted;
+   qboolean            ignoreAdminWarnings;
+   qboolean            denyBuild;
+@@ -769,8 +770,13 @@ typedef struct
+   qboolean          uncondHumanWin;
+   qboolean          alienTeamLocked;
+   qboolean          humanTeamLocked;
+-  qboolean paused;
+-  int pausedTime;
++  qboolean          paused;
++  int               pauseTime;
++  float             pause_speed;
++  float             pause_gravity;
++  float             pause_knockback;
++  int               pause_ff;
++  int               pause_ffb;
+ 
+   int               bleeders;
+ 
+Index: src/game/g_main.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_main.c,v
+retrieving revision 1.1.1.1.4.22
+diff -u -p -r1.1.1.1.4.22 g_main.c
+--- src/game/g_main.c	17 Feb 2009 17:31:27 -0000	1.1.1.1.4.22
++++ src/game/g_main.c	17 Feb 2009 18:25:06 -0000
+@@ -3174,16 +3174,16 @@ void G_RunFrame( int levelTime )
+   
+   if( level.paused ) 
+   {
+-    level.pausedTime = levelTime - level.time;
+-    if( ( level.pausedTime % 3000 ) == 0) 
+-      trap_SendServerCommand( -1, "cp \"The game has been paused. Please wait.\"" );
+-    
+-   for(i=0;i<level.maxclients;i++)
+-   {
+-     level.clients[ i ].ps.commandTime = levelTime;
+-   }
++    if( ( levelTime % 6000 ) == 0)
++      trap_SendServerCommand( -1, "cp \"^3Game is paused.\"" );
+ 
+-   return;
++    level.startTime += levelTime - level.time;
++    trap_SetConfigstring( CS_LEVEL_START_TIME, va( "%i", level.startTime ) );
++
++    if( levelTime - level.pauseTime > 3 * 60000 )
++    {
++      trap_SendConsoleCommand( EXEC_APPEND, "!unpause" );
++    }
+   }
+ 
+   CheckMsgTimer( );
+@@ -3336,7 +3336,5 @@ void G_RunFrame( int levelTime )
+ 
+     trap_Cvar_Set( "g_listEntity", "0" );
+   }
+-  
+-  level.pausedTime=0;
+ }
+ 
+Index: src/game/g_weapon.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_weapon.c,v
+retrieving revision 1.1.1.1.4.4
+diff -u -p -r1.1.1.1.4.4 g_weapon.c
+--- src/game/g_weapon.c	17 Feb 2009 14:55:14 -0000	1.1.1.1.4.4
++++ src/game/g_weapon.c	17 Feb 2009 18:18:16 -0000
+@@ -1569,6 +1569,8 @@ FireWeapon
+ */
+ void FireWeapon( gentity_t *ent )
+ {
++  if( level.paused ) return;
++
+   if( ent->client )
+   {
+     // set aiming directions

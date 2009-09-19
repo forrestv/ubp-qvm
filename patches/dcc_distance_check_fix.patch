@@ -1,0 +1,16 @@
+Index: src/game/g_buildable.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_buildable.c,v
+retrieving revision 1.1.1.1.4.8
+diff -u -p -r1.1.1.1.4.8 g_buildable.c
+--- src/game/g_buildable.c	17 Feb 2009 19:51:17 -0000	1.1.1.1.4.8
++++ src/game/g_buildable.c	21 Feb 2009 00:15:48 -0000
+@@ -282,7 +282,7 @@ static qboolean G_FindDCC( gentity_t *se
+     {
+       VectorSubtract( self->s.origin, ent->s.origin, temp_v );
+       distance = VectorLength( temp_v );
+-      if( distance < minDistance && ent->powered )
++      if( ( !foundDCC || distance < minDistance ) && ent->powered )
+       {
+         closestDCC = ent;
+         minDistance = distance;

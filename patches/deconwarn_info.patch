@@ -1,0 +1,78 @@
+Index: src/game/g_cmds.c
+===================================================================
+RCS file: /devel/cvs/tremulous/src/game/g_cmds.c,v
+retrieving revision 1.1.1.1.4.2
+diff -u -p -r1.1.1.1.4.2 g_cmds.c
+--- src/game/g_cmds.c	17 Feb 2009 02:54:38 -0000	1.1.1.1.4.2
++++ src/game/g_cmds.c	17 Feb 2009 03:20:20 -0000
+@@ -2617,19 +2617,33 @@ DBCommand
+ Send command to all designated builders of selected team
+ =================
+ */
+-void DBCommand( pTeam_t team, const char *text )
++void DBCommand( gentity_t *builder, pTeam_t team, const char *text )
+ {
+   int i;
+   gentity_t *ent;
+ 
++  if( g_floodMinTime.integer && G_Flood_Limited( builder ) )
++  {
++    trap_SendServerCommand( builder-g_entities,
++      "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
++    return;
++  }
++
++  trap_SendServerCommand( builder-g_entities, 
++    "print \"This structure is protected by designated builder\n\"" );
++
+   for( i = 0, ent = g_entities + i; i < level.maxclients; i++, ent++ )
+   {
+-    if( !ent->client || ( ent->client->pers.connected != CON_CONNECTED ) ||
+-        ( ent->client->pers.teamSelection != team ) ||
+-        !ent->client->pers.designatedBuilder )
++    if( !ent->client || ent->client->pers.connected != CON_CONNECTED )
+       continue;
+ 
+-    trap_SendServerCommand( i, text );
++    if( ( ent->client->pers.teamSelection == team &&
++          ent->client->pers.designatedBuilder ) ||
++      ( ent->client->pers.teamSelection == PTE_NONE &&
++        G_admin_permission( ent, ADMF_SPEC_ALLCHAT ) ) )
++    {
++      trap_SendServerCommand( i, text );
++    }
+   }
+ }
+ 
+@@ -2662,11 +2676,10 @@ void Cmd_Destroy_f( gentity_t *ent )
+     if( ( ent->client->hovel->s.eFlags & EF_DBUILDER ) &&
+       !ent->client->pers.designatedBuilder )
+     {
+-      trap_SendServerCommand( ent-g_entities, 
+-        "print \"This structure is protected by designated builder\n\"" );
+-      DBCommand( ent->client->pers.teamSelection,
+-        va( "print \"%s^3 has attempted to decon a protected structure!\n\"",
+-          ent->client->pers.netname ) );
++      DBCommand( ent, ent->client->pers.teamSelection,
++        va( "print \"%s^3 has attempted to decon a protected %s!\n\"",
++          ent->client->pers.netname,
++          BG_FindHumanNameForBuildable( ent->client->hovel->s.modelindex ) ) );
+       return;
+     }
+     G_Damage( ent->client->hovel, ent, ent, forward, ent->s.origin, 
+@@ -2696,11 +2709,10 @@ void Cmd_Destroy_f( gentity_t *ent )
+       if( ( traceEnt->s.eFlags & EF_DBUILDER ) &&
+         !ent->client->pers.designatedBuilder )
+       {
+-        trap_SendServerCommand( ent-g_entities, 
+-          "print \"This structure is protected by designated builder\n\"" );
+-        DBCommand( ent->client->pers.teamSelection,
+-          va( "print \"%s^3 has attempted to decon a protected structure!\n\"",
+-            ent->client->pers.netname ) );
++        DBCommand( ent, ent->client->pers.teamSelection,
++          va( "print \"%s^3 has attempted to decon a protected %s!\n\"",
++            ent->client->pers.netname,
++            BG_FindHumanNameForBuildable( traceEnt->s.modelindex ) ) );
+         return;
+       }
+  
