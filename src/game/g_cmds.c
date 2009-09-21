@@ -1701,7 +1701,7 @@ void Cmd_CallVote_f( gentity_t *ent )
     }
 	level.votePassThreshold = g_extremeSuddenDeathVotePercent.integer;
     Com_sprintf( level.voteString, sizeof( level.voteString ),
-      "set g_extremeSuddenDeath 1" );
+      "extremesuddendeath" );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
       "Begin extreme sudden death" );
   }
