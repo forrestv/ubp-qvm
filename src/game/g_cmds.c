@@ -1686,13 +1686,18 @@ void Cmd_CallVote_f( gentity_t *ent )
      {
        trap_SendServerCommand( ent-g_entities, "print \"Extreme Sudden Death votes have been disabled\n\"" );
        return;
-     } 
-    if( g_extremeSuddenDeath.integer )
-    {
-      trap_SendServerCommand( ent - g_entities,
-        "print \"callvote: the game is already in extreme sudden death\n\"" );
-      return;
-    }
+     }
+	  if( !g_suddenDeath.integer )
+	 {
+	   trap_SendServerCommand( ent-g_entities, "print \"You cannot vote for Extreme Sudden Death before Sudden Death\n\"" );
+	   return;
+	  }
+      if( g_extremeSuddenDeath.integer )
+      {
+        trap_SendServerCommand( ent - g_entities,
+          "print \"callvote: the game is already in extreme sudden death\n\"" );
+        return;
+      }
     else if( level.extremeSuddenDeathWarning == TW_IMMINENT )
     {
       trap_SendServerCommand( ent - g_entities,

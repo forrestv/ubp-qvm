@@ -1767,6 +1767,11 @@ void HRepeater_Think( gentity_t *self )
         reactor = qtrue;
     }
   }
+  
+  if( level.extremeSuddenDeath )
+  {
+	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+	}
 
   if( G_NumberOfDependants( self ) == 0 )
   {

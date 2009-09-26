@@ -1233,7 +1233,7 @@ int G_TimeTilExtremeSuddenDeath( void )
 		             ( level.time - level.startTime );
 }
 
-#define PLAYER_COUNT_MOD 5.0f
+#define PLAYER_COUNT_MOD 7.0f
 
 /*
 ============
@@ -1326,6 +1326,10 @@ if( !level.extremeSuddenDeath )
 		{
 		trap_SendServerCommand( -1, "cp \"^1EXTREME SUDDEN DEATH! NO SPAWNS! NO BUILDING!\"" );
 		G_LogPrintf("Beginning Extreme Sudden Death\n");
+		level.alienTeamLocked=qtrue;
+		level.humanTeamLocked=qtrue;
+		AP( va( "print \"^3!lock: ^7Human team has been locked by console\n\"") );
+		AP( va( "print \"^3!lock: ^7Alien team has been locked by console\n\"") );
 	    localHTP = 0;
 		localATP = 0;
 		level.suddenDeathHBuildPoints = localHTP;
@@ -2339,6 +2343,10 @@ void CheckExitRules( void )
     trap_SetConfigstring( CS_WINNER, "Humans Win" );
     LogExit( "Humans win." );
     G_admin_maplog_result( "h" );
+	if( level.time <= level.startTime + 180000 )
+	{
+	  trap_SendConsoleCommand( EXEC_APPEND, "map_restart" );
+	  }
   }
   else if( level.uncondAlienWin ||
            ( ( level.time > level.startTime + 1000 ) &&
@@ -2351,6 +2359,10 @@ void CheckExitRules( void )
     trap_SetConfigstring( CS_WINNER, "Aliens Win" );
     LogExit( "Aliens win." );
     G_admin_maplog_result( "a" );
+	if( level.time <= level.startTime + 180000 )
+	{
+	  trap_SendConsoleCommand( EXEC_APPEND, "map_restart" );
+	  }
   }
 }
 
