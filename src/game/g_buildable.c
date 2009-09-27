@@ -358,43 +358,6 @@ static qboolean G_FindOvermind( gentity_t *self )
   return qfalse;
 }
 
-static int G_FindHovel( gentity_t *self )
-{
-  int       i;
-  gentity_t *ent;
-
-  int count = 0;
-  //iterate through entities
-  for( i = 1, ent = g_entities + i; i < level.num_entities; i++, ent++ )
-  {
-    if( ent->s.eType != ET_BUILDABLE )
-      continue;
-    if( ent == self)
-      continue;
-    if( ent->s.modelindex == BA_A_HOVEL && ent->spawned && ent->health > 0 )
-    {
-      count++;
-    }
-  }
-  // choose a random one
-  if (count == 0) return 0;
-  count = rand() % count;
-  
-  // return its index
-  for( i = 1, ent = g_entities + i; i < level.num_entities; i++, ent++ )
-  {
-    if( ent->s.eType != ET_BUILDABLE )
-      continue;
-    if( ent == self)
-      continue;
-    if( ent->s.modelindex == BA_A_HOVEL && ent->spawned && ent->health > 0 )
-    {
-      if (count == 0) return i;
-      count--;
-    }
-  }
-}
-
 
 /*
 ================
@@ -1248,6 +1211,7 @@ void AHive_Think( gentity_t *self )
 AHovel_Blocked
 
 Is this hovel entrance blocked?
+
 ================
 */
 qboolean AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provideExit )
@@ -1256,9 +1220,18 @@ qboolean AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provideEx
   vec3_t    mins, maxs;
   float     displacement;
   trace_t   tr;
+  
+  int entityPassNum = -1;
+  int class = PCL_ALIEN_LEVEL4;
+  int contentmask = CONTENTS_SOLID|CONTENTS_PLAYERCLIP;
+  if ( player ) {
+      entityPassNum = player->s.number;
+      class = player->client->ps.stats[ STAT_PCLASS ];
+      contentmask = CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY;
+  }
 
   BG_FindBBoxForBuildable( BA_A_HOVEL, NULL, hovelMaxs );
-  BG_FindBBoxForClass( player->client->ps.stats[ STAT_PCLASS ],
+  BG_FindBBoxForClass( class,
                        mins, maxs, NULL, NULL, NULL );
 
   VectorCopy( hovel->s.origin2, normal );
@@ -1275,7 +1248,7 @@ qboolean AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provideEx
 
   // see if there's something between the hovel and its exit 
   // (eg built right up against a wall)
-  trap_Trace( &tr, start, NULL, NULL, end, player->s.number, MASK_PLAYERSOLID );
+  trap_Trace( &tr, start, NULL, NULL, end, entityPassNum, contentmask );
   if( tr.fraction < 1.0f )
     return qtrue;
 
@@ -1284,30 +1257,34 @@ qboolean AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provideEx
   VectorMA( origin, HOVEL_TRACE_DEPTH, normal, start );
 
   //compute a place up in the air to start the real trace
-  trap_Trace( &tr, origin, mins, maxs, start, player->s.number, MASK_PLAYERSOLID );
+  trap_Trace( &tr, origin, mins, maxs, start, entityPassNum, contentmask );
 
   VectorMA( origin, ( HOVEL_TRACE_DEPTH * tr.fraction ) - 1.0f, normal, start );
   VectorMA( origin, -HOVEL_TRACE_DEPTH, normal, end );
 
-  trap_Trace( &tr, start, mins, maxs, end, player->s.number, MASK_PLAYERSOLID );
+  trap_Trace( &tr, start, mins, maxs, end, entityPassNum, contentmask );
 
   VectorCopy( tr.endpos, origin );
 
-  trap_Trace( &tr, origin, mins, maxs, origin, player->s.number, MASK_PLAYERSOLID );
-
-  if( provideExit )
-  {
-    G_SetOrigin( player, origin );
-    VectorCopy( origin, player->client->ps.origin );
-    // nudge
-    VectorMA( normal, 200.0f, forward, player->client->ps.velocity );
-    G_SetClientViewAngle( player, angles );
-  }
+  trap_Trace( &tr, origin, mins, maxs, origin, entityPassNum, contentmask );
 
   if( tr.fraction < 1.0f )
     return qtrue;
-  else
-    return qfalse;
+  
+  if( provideExit && player )
+  {
+    player->client->ps.eFlags ^= EF_TELEPORT_BIT;
+    player->client->ps.eFlags &= ~EF_NODRAW;
+    G_UnlaggedClear( player );
+    
+    G_SetOrigin( player, origin );
+    VectorCopy( origin, player->client->ps.origin );
+    
+    VectorCopy( vec3_origin, player->client->ps.velocity );
+    G_SetClientViewAngle( player, angles );
+  }
+
+  return qfalse;
 }
 
 /*
@@ -1317,8 +1294,7 @@ APropHovel_Blocked
 Wrapper to test a hovel placement for validity
 ================
 */
-static qboolean APropHovel_Blocked( vec3_t origin, vec3_t angles, vec3_t normal,
-                                    gentity_t *player )
+static qboolean APropHovel_Blocked( vec3_t origin, vec3_t angles, vec3_t normal )
 {
   gentity_t hovel;
 
@@ -1326,7 +1302,65 @@ static qboolean APropHovel_Blocked( vec3_t origin, vec3_t angles, vec3_t normal,
   VectorCopy( angles, hovel.s.angles );
   VectorCopy( normal, hovel.s.origin2 );
 
-  return AHovel_Blocked( &hovel, player, qfalse );
+  return AHovel_Blocked( &hovel, NULL, qfalse );
+}
+
+static int G_FindRandomHovel( gentity_t *self )
+{
+  int       i;
+  gentity_t *ent;
+
+  int count = 0;
+  //iterate through entities
+  for( i = 1, ent = g_entities + i; i < level.num_entities; i++, ent++ )
+  {
+    if( ent->s.eType != ET_BUILDABLE )
+      continue;
+    if( ent == self)
+      continue;
+    if( ent->s.modelindex == BA_A_HOVEL && ent->spawned && ent->health > 0 )
+    {
+      count++;
+    }
+  }
+  // choose a random one
+  if (count == 0) return -1;
+  count = rand() % count;
+  
+  // return its index
+  for( i = 1, ent = g_entities + i; i < level.num_entities; i++, ent++ )
+  {
+    if( ent->s.eType != ET_BUILDABLE )
+      continue;
+    if( ent == self)
+      continue;
+    if( ent->s.modelindex == BA_A_HOVEL && ent->spawned && ent->health > 0 )
+    {
+      if (count == 0) return i;
+      count--;
+    }
+  }
+  return -1; // shouldn't happen silly compiler
+}
+
+static int G_FindNextHovel( gentity_t *self )
+{
+  int       i;
+  gentity_t *ent;
+
+  int self_index = self - g_entities;
+  // loops from entity after self to entity before self
+  for(i = (self_index + 1) % level.num_entities; i != self_index; i = (i + 1) % level.num_entities)
+  {
+    ent = g_entities + i;
+    
+    if( ent->s.eType != ET_BUILDABLE ) continue;
+    if( ent->s.modelindex != BA_A_HOVEL ) continue;
+    if( !ent->spawned || ent->health <= 0 ) continue;
+    
+    return i;
+  }
+  return -1;
 }
 
 /*
@@ -1338,65 +1372,34 @@ Called when an alien uses a hovel
 */
 void AHovel_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 {
-  vec3_t  hovelOrigin, hovelAngles, inverseNormal;
-      gentity_t *otherh;
+  gentity_t *otherh;
+  int other_index;
 
-  if( self->spawned && G_FindOvermind( self ) )
+  if( !self->spawned ) return;
+  if( !G_FindOvermind( self ) ) return;
+  if( self->health <= 0 ) return;
+  if( activator->health <= 0 ) return;
+  
+  other_index = G_FindNextHovel(self);
+  if (other_index == -1)
   {
-    /* if( self->active )
-    {
-      //this hovel is in use
-      G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_OCCUPIED );
-    }
-    else */ if( 
-//    ( ( activator->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0 ) ||
-//               ( activator->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0_UPG ) ) &&
-             activator->health > 0 && self->health > 0 )
-    {
-      int other_index = G_FindHovel(self);
-      if (!other_index)
-      {
-        //using same error
-        G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_BLOCKED );
-        return;
-      }
-      otherh = g_entities + other_index;
-      if( AHovel_Blocked( otherh, activator, qfalse ) )
-      {
-        //you can get in, but you can't get out
-        G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_BLOCKED );
-        return;
-      }
-
-      //self->active = qtrue;
-      G_SetBuildableAnim( self, BANIM_ATTACK1, qfalse );
-      G_SetBuildableAnim( otherh, BANIM_ATTACK1, qfalse );
-  if( 1 )
+    //using same error for only one hovel built
+    G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_BLOCKED );
+    return;
+  }
+  
+  otherh = g_entities + other_index;
+  if( AHovel_Blocked( otherh, activator, qfalse ) )
   {
-    gentity_t *builder = activator;
-    vec3_t    newOrigin;
-    vec3_t    newAngles;
-
-//    VectorCopy( otherh->s.angles, newAngles );
-//    newAngles[ ROLL ] = 0;
-
-//    VectorCopy( otherh->s.origin, newOrigin );
-//    VectorMA( newOrigin, 1.0f, otherh->s.origin2, newOrigin );
-
-    //prevent lerping
-    builder->client->ps.eFlags ^= EF_TELEPORT_BIT;
-    builder->client->ps.eFlags &= ~EF_NODRAW;
-    G_UnlaggedClear( builder );
-AHovel_Blocked( otherh, activator, qtrue );
-//    G_SetOrigin( builder, newOrigin );
-//    VectorCopy( newOrigin, builder->client->ps.origin );
-//    G_SetClientViewAngle( builder, newAngles );
-
-    //client leaves hovel
-    //builder->client->ps.stats[ STAT_STATE ] &= ~SS_HOVELING;
+    //exit blocked
+    G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_BLOCKED );
+    return;
   }
-    }
-  }
+
+  G_SetBuildableAnim( self, BANIM_ATTACK1, qfalse );
+  G_SetBuildableAnim( otherh, BANIM_ATTACK1, qfalse );
+  
+  AHovel_Blocked( otherh, activator, qtrue );
 }
 
 
@@ -3237,12 +3240,7 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int distance
 
     if( buildable == BA_A_HOVEL )
     {
-      vec3_t    builderMins, builderMaxs;
-
-      //this assumes the adv builder is the biggest thing that'll use the hovel
-      BG_FindBBoxForClass( PCL_ALIEN_BUILDER0_UPG, builderMins, builderMaxs, NULL, NULL, NULL );
-
-      if( APropHovel_Blocked( origin, angles, normal, ent ) )
+      if( APropHovel_Blocked( origin, angles, normal ) )
         reason = IBE_HOVELEXIT;
     }
 
