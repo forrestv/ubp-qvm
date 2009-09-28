@@ -1201,10 +1201,82 @@ void AHive_Think( gentity_t *self )
 
 //==================================================================================
 
+qboolean rayAABBIntersect1D(float start, float end, float min, float max, float* fraction)
+{
+    float dist = end - start;
+    float t0, t1;
+    
+    // ray parallel to direction
+    if(!dist)
+    {
+      if (start >= min && start <= max) {
+          *fraction = 0.;
+          return qtrue;
+      }
+      return qfalse;
+    }
 
+    // intersection params
+    t0 = (min - start) / dist;
+    t1 = (max - start) / dist;
 
+    if (t0 > t1) {
+        float tmp;
+        tmp = t0;
+        t0 = t1;
+        t1 = tmp;
+    }
+    // t0 is smaller
 
-#define HOVEL_TRACE_DEPTH 128.0f
+    if (t1 < 0 || t0 > 1)
+        return qfalse;
+
+    if( t0 < 0. )
+        *fraction = 0.;
+    else
+        *fraction = t0;
+    
+    return qtrue;
+}
+
+void rayAABBIntersect(vec3_t start, vec3_t end, vec3_t mins, vec3_t maxs, float *fraction)
+{
+  int i;
+  float myfrac = 0;
+  float tmp;
+  for( i = 0; i<3; i++ ) {
+    if( !rayAABBIntersect1D( start[i], end[i], mins[i], maxs[i], &tmp ) )
+      return;
+    if (tmp > myfrac)
+      myfrac = tmp;
+  }
+  if( myfrac < *fraction )
+    *fraction = myfrac;
+}
+
+void Trace_Box(trace_t *tr, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, vec3_t boxpos, vec3_t boxmins, vec3_t boxmaxs)
+{
+  vec3_t mins2, maxs2;
+  vec3_t start2, end2;
+  int i;
+  
+  VectorAdd(mins, boxmins, mins2);
+  VectorAdd(maxs, boxmaxs, maxs2);
+  VectorSubtract(start, boxpos, start2);
+  VectorSubtract(end, boxpos, end2);
+    
+  tr->fraction = 1.0f;
+  
+  rayAABBIntersect(start2, end2, mins2, maxs2, &tr->fraction);
+
+  tr->fraction -= 1./Distance(start, end);
+
+  if( tr->fraction < 0 )
+    tr->fraction = 0;
+  
+  for( i=0 ; i<3 ; i++ )
+    tr->endpos[i] = start[i] + tr->fraction * (end[i] - start[i]);
+}
 
 /*
 ================
@@ -1212,60 +1284,53 @@ AHovel_Blocked
 
 Is this hovel entrance blocked?
 
-provideExit - false is for choosing a place to build, true is for think and use
+provideExit makes it specific to player's class, and does it if possible
 
 ================
 */
 gentity_t *AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provideExit )
 {
-  vec3_t    forward, normal, origin, start, end, angles, hovelMins, hovelMaxs, origin2;
-  vec3_t    mins, maxs;
+  vec3_t    forward, normal, origin, angles, hovelMins, hovelMaxs, origin2;
   vec3_t up = {0,0,1};
   float     displacement;
   trace_t   tr;
+  vec3_t mins={-25,-25,-25}, maxs = {25,25,25};
   
   int entityPassNum = -1;
-  int class = PCL_ALIEN_LEVEL4;
   int contentmask = CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY;
   if ( player ) {
       entityPassNum = player->s.number;
-      class = player->client->ps.stats[ STAT_PCLASS ];
+      if( provideExit )
+        BG_FindBBoxForClass( player->client->ps.stats[ STAT_PCLASS ],
+                       mins, maxs, NULL, NULL, NULL );
   }
 
-  BG_FindBBoxForBuildable( BA_A_HOVEL, NULL, hovelMaxs );
-  BG_FindBBoxForClass( class,
-                       mins, maxs, NULL, NULL, NULL );
+  BG_FindBBoxForBuildable( BA_A_HOVEL, hovelMins, hovelMaxs );
 
   VectorCopy( hovel->s.origin2, normal );
   AngleVectors( hovel->s.angles, forward, NULL, NULL );
   VectorInverse( forward );
 
   displacement = (VectorMaxComponent( maxs ) +
-                 VectorMaxComponent( hovelMaxs ))*1.414213 + 1.0f; // sqrt(2)
+                 VectorMaxComponent( hovelMaxs ))*10.;
+
 
   VectorMA( hovel->s.origin, displacement, forward, origin );
+  Trace_Box( &tr, origin, mins, maxs, hovel->s.origin, hovel->s.origin, hovelMins, hovelMaxs );
+  VectorCopy( tr.endpos, origin );
+  
+  VectorMA( origin, 25, up, origin2 );
+  
+  trap_Trace( &tr, origin2, mins, maxs, origin2, entityPassNum, contentmask );
+  if( tr.entityNum != ENTITYNUM_NONE )
+    return &g_entities[ tr.entityNum ];
+  
+  trap_Trace( &tr, origin2, mins, maxs, origin, entityPassNum, contentmask );
+  VectorCopy( tr.endpos, origin );
+  
+  VectorMA( origin, -25, up, origin );
   VectorMA( origin, -mins[2], up, origin );
-  trap_Trace( &tr, origin, mins, maxs, origin, entityPassNum, contentmask );
 
-  if( tr.fraction < 1.0f && tr.entityNum != hovel->s.number)
-    return g_entities + tr.entityNum;
-  
-  //bring dest horizontally closer
-  VectorMA( hovel->s.origin, -mins[2], up, origin2 );
-  trap_Trace( &tr, origin, mins, maxs, origin2, entityPassNum, contentmask );
-  VectorCopy( tr.endpos, origin );
-  
-  //bring dest vertically closer
-  VectorMA( hovel->s.origin, displacement, forward, origin2 );
-  origin2[0] = origin[0];
-  origin2[1] = origin[1];
-  trap_Trace( &tr, origin, mins, maxs, origin2, entityPassNum, contentmask );
-  VectorCopy( tr.endpos, origin );
-  
-  trap_Trace( &tr, origin, mins, maxs, origin, entityPassNum, contentmask );
-
-  if( tr.fraction < 1.0f && tr.entityNum != hovel->s.number )
-    return g_entities + tr.entityNum;
   if( provideExit && player )
   {
     player->client->ps.eFlags ^= EF_TELEPORT_BIT;
@@ -1280,7 +1345,7 @@ gentity_t *AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provide
     vectoangles( forward, angles );
     G_SetClientViewAngle( player, angles );
   }
-
+ 
   return NULL;
 }
 
@@ -1427,24 +1492,19 @@ void AHovel_Think( gentity_t *self )
         // If it's part of the map, kill self. 
         if( ent->s.eType == ET_BUILDABLE )
         {
-       trap_SendServerCommand( -1, "cp \"1\"" );
           G_Damage( ent, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
-          G_SetBuildableAnim( self, BANIM_SPAWN1, qtrue );
         }
         else if( ent->s.number == ENTITYNUM_WORLD || ent->s.eType == ET_MOVER )
         {
-       trap_SendServerCommand( -1, "cp \"2\"" );
           G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
           return;
         }
         else if( g_antiSpawnBlock.integer && ent->client && 
                  ent->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
-        {
-       trap_SendServerCommand( -1, "cp \"3\"" );
+       {
           //spawnblock protection
           if( self->spawnBlockTime && level.time - self->spawnBlockTime > 10000 )
           {
-       trap_SendServerCommand( -1, "cp \"4\"" );
             //five seconds of countermeasures and we're still blocked
             //time for something more drastic
             G_Damage( ent, NULL, NULL, NULL, NULL, 10000, 0, MOD_TRIGGER_HURT );
@@ -1455,7 +1515,6 @@ void AHovel_Think( gentity_t *self )
           //five seconds of blocked by client and...
           {
             vec3_t velocity;
-       trap_SendServerCommand( -1, "cp \"5\"" );
             //random direction
             velocity[0] = crandom() * g_antiSpawnBlock.integer;
             velocity[1] = crandom() * g_antiSpawnBlock.integer;
