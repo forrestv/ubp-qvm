@@ -118,6 +118,8 @@ char *modNames[ ] =
   "MOD_ASPAWN",
   "MOD_ATUBE",
   "MOD_OVERMIND",
+  "MOD_EXPLODE",
+  "MOD_EXPLODE_SPLASH",
   "MOD_SLAP"
 };
 
@@ -210,6 +212,31 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
     trap_SendServerCommand( -1,
       va( "print \"%s^7 felt %s^7's authority\n\"",
       self->client->pers.netname, killerName ) );
+    goto finish_dying;
+  }
+  
+  if( meansOfDeath == MOD_EXPLODE )
+  {
+    if( !attacker || self == attacker )
+      trap_SendServerCommand( -1, va( "print \"%s^7 spontaneously combusted\n\"",
+        self->client->pers.netname ) );
+    else
+      trap_SendServerCommand( -1,
+        va( "print \"%s^7 was exploded by %s^7\n\"",
+        self->client->pers.netname, killerName ) );
+
+    // do not send obituary or credit any kills by slapping, skip straight to
+    // setting the animations etc
+    goto finish_dying;
+  }
+  if( meansOfDeath == MOD_EXPLODE_SPLASH )
+  {
+    trap_SendServerCommand( -1,
+      va( "print \"%s^7 was caught in an explosion^7\n\"",
+      self->client->pers.netname ) );
+
+    // do not send obituary or credit any kills by slapping, skip straight to
+    // setting the animations etc
     goto finish_dying;
   }
 

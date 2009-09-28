@@ -141,7 +141,22 @@ g_admin_cmd_t g_admin_cmds[ ] =
 	{"drop", G_admin_drop, "drop",
       "kick a client from the server without log",
       "[^3name|slot#^7] [^3message^7]"
-    }, 
+    },
+	
+	{"explode", G_admin_explode, "explode",
+     "kill a player in an explosion",
+     "[^3name|slot#^7]"
+    },
+	
+	{"forcespec", G_admin_forcespec, "forcespec",
+      "force a player to remain on the spectator team",
+      "[^3name|slot#^7]"
+    },
+
+    {"unforcespec", G_admin_unforcespec, "forcespec",
+      "allow a player to join a team besides spectators",
+      "[^3name|slot#^7]"
+    },
 	
 	{ 
      "godmode", G_admin_godmode, "godmode",
@@ -316,6 +331,11 @@ g_admin_cmd_t g_admin_cmds[ ] =
       "\n ^3Example:^7 '!subnetban 10 24' changes ban #10 to be a ban on XXX.XXX.XXX.*"
       "\n ^3Example:^7 '!subnetban 10 32' changes ban #10 to be a regular (non-subnet) ban"
       "\n ^1WARNING:^7 Use of this command may make your admin.dat incompatible with other game.qvms"
+    },
+	
+	{"switch", G_admin_switch, "switch",
+      "switch places with somenone",
+      "[^3name|slot#^7]"
     },
 
     {"time", G_admin_time, "time",
@@ -6426,6 +6446,215 @@ qboolean G_admin_L1(gentity_t *ent, int skiparg ){
   }
  
   trap_SendConsoleCommand( EXEC_APPEND,va( "!setlevel %d 1;", pids[ 0 ] ) );
+  return qtrue;
+}
+
+qboolean G_admin_switch( gentity_t *ent, int skiparg )
+{
+  int pids[ MAX_CLIENTS ];
+  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
+  int minargc;
+  gentity_t *vic;
+
+  if( !ent )
+  {
+  ADMP( "^3!switch: ^7console cannot use this command\n" );
+    return qfalse;
+  }
+    minargc = 2 + skiparg;
+
+  if( G_SayArgc() < minargc )
+  {
+    ADMP( "^3!switch: ^7usage: !switch [name|slot#]\n" );
+    return qfalse;
+  }
+  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
+
+  if( G_ClientNumbersFromString( name, pids ) != 1 )
+  {
+    G_MatchOnePlayer( pids, err, sizeof( err ) );
+    ADMP( va( "^3!switch: ^7%s\n", err ) );
+    return qfalse;
+  }
+
+  vic = &g_entities[ pids[ 0 ] ];
+
+
+//put them on noclip
+vic->client->noclip = qtrue;
+ent->client->noclip = qtrue;
+
+//switch places
+  trap_UnlinkEntity( ent );
+  VectorCopy( vic->s.origin, ent->client->ps.origin );
+
+//switch places
+  trap_UnlinkEntity( vic );
+  VectorCopy( ent->s.origin, vic->client->ps.origin );
+
+//spectator fix
+  if( ent->client->sess.spectatorState == SPECTATOR_NOT )
+    trap_LinkEntity (ent);
+
+  if( vic->client->sess.spectatorState == SPECTATOR_NOT )
+    trap_LinkEntity (vic);
+
+
+//take them off noclip
+vic->client->noclip = qfalse;
+ent->client->noclip = qfalse;
+
+     trap_SendServerCommand( vic-g_entities, va( "print \"^7%s^7 switched with you\n\"", ent->client->pers.netname ) );
+     trap_SendServerCommand( ent-g_entities, va( "print \"^7you switched with ^7%s^7\n\"", vic->client->pers.netname ) );
+
+
+
+  return qtrue;
+
+}
+
+qboolean G_admin_forcespec( gentity_t *ent, int skiparg )
+{
+  int pids[ MAX_CLIENTS ];
+  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
+  int minargc;
+  gentity_t *vic;
+
+
+    minargc = 2 + skiparg;
+
+  if( G_SayArgc() < minargc )
+  {
+    ADMP( "^3!forcespec: ^7usage: !forcespec [name|slot#]\n" );
+    return qfalse;
+  }
+  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
+
+  if( G_ClientNumbersFromString( name, pids ) != 1 )
+  {
+    G_MatchOnePlayer( pids, err, sizeof( err ) );
+    ADMP( va( "^3!forcespec: ^7%s\n", err ) );
+    return qfalse;
+  }
+
+  vic = &g_entities[ pids[ 0 ] ];
+
+ if ( vic->client->pers.specd == qtrue )
+ {
+ ADMP( "^3!forcespec: ^7player already forcespeced\n" );
+
+        return qfalse;
+ }
+
+//push them to the spec team
+G_ChangeTeam( vic, PTE_NONE );
+//tell g_cmds that they cannot join teams
+vic->client->pers.specd = qtrue;
+//tell the person they cant join teams
+CPx( pids[ 0 ], "cp \"^1You can no longer join teams\"" );
+//tell everyone that you can join teams
+AP( va( "print \"^3!forcespec: ^7%s^7 has disallowed joining of teams for ^7%s\n\"", ( ent ) ? ent->client->pers.netname : "console", vic->client->pers.netname ) );
+//tell g_cmds to save their creds
+vic->client->pers.saved = qtrue;
+        return qtrue;
+
+}
+
+qboolean G_admin_unforcespec( gentity_t *ent, int skiparg )
+{
+  int pids[ MAX_CLIENTS ];
+  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
+  int minargc;
+  gentity_t *vic;
+
+
+    minargc = 2 + skiparg;
+
+  if( G_SayArgc() < minargc )
+  {
+    ADMP( "^3!unforcespec: ^7usage: !unforcespec [name|slot#]\n" );
+    return qfalse;
+  }
+  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
+
+  if( G_ClientNumbersFromString( name, pids ) != 1 )
+  {
+    G_MatchOnePlayer( pids, err, sizeof( err ) );
+    ADMP( va( "^3!unforcespec: ^7%s\n", err ) );
+    return qfalse;
+  }
+
+  vic = &g_entities[ pids[ 0 ] ];
+
+ if ( vic->client->pers.specd == qfalse )
+ {
+ ADMP( "^3!unforcespec: ^7player is not forcespeced\n" );
+
+        return qfalse;
+ }
+
+
+
+//remove the limitation
+vic->client->pers.specd = qfalse;
+//tell them it was removed
+CPx( pids[ 0 ], "cp \"^1You can now join teams\"" );
+//tell everyone that it was removed
+AP( va( "print \"^3!unforcespec: ^7%s^7 has allowed joining of teams for ^7%s\n\"", ( ent ) ? ent->client->pers.netname : "console", vic->client->pers.netname ) );
+        return qtrue;
+
+}
+
+qboolean G_admin_explode( gentity_t *ent, int skiparg )
+{
+  int pids[ MAX_CLIENTS ];
+  int damage = 0;
+  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
+  char command[ MAX_ADMIN_CMD_LEN ], *cmd;
+  gentity_t *vic, *tent;
+
+  if( G_SayArgc() < 2 + skiparg )
+  {
+    ADMP( "^3!explode: ^7usage: !explode: [name|slot#]\n" );
+    return qfalse;
+  }
+  G_SayArgv( skiparg, command, sizeof( command ) );
+  cmd = command;
+  if( cmd && *cmd == '!' )
+    cmd++;
+  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
+  if( G_ClientNumbersFromString( name, pids ) != 1 )
+  {
+    G_MatchOnePlayer( pids, err, sizeof( err ) );
+    ADMP( va( "^3!explode: ^7%s\n", err ) );
+    return qfalse;
+  }
+  if( !admin_higher( ent, &g_entities[ pids[ 0 ] ] ) )
+  {
+    ADMP( "^3!explode: ^7Sorry, but your intended victim"
+        " has a higher admin level than you\n" );
+    return qfalse;
+  }
+  vic = &g_entities[ pids[ 0 ] ];
+  if( vic->client->pers.teamSelection == PTE_NONE ||
+      vic->client->pers.classSelection == PCL_NONE || vic->client->ps.pm_flags & PMF_QUEUED ) {
+    ADMP( "^3!explode: ^7Can't explode thin air\n" );
+    return qfalse;
+  }
+  tent = G_TempEntity( vic->s.origin, EV_HUMAN_BUILDABLE_EXPLOSION );
+  damage = BG_FindHealthForClass( vic->client->ps.stats[ STAT_PCLASS ] );
+  vic->health -= damage;
+  vic->client->ps.stats[ STAT_HEALTH ] = vic->health;
+  vic->lastDamageTime = level.time;
+  if( vic->health <= 0 )
+  {
+    vic->enemy = ent;
+    vic->die( vic, ent, ent, damage, MOD_EXPLODE );
+  }
+  G_RadiusDamage( vic->r.currentOrigin, vic->parent, GRENADE_DAMAGE,
+                  GRENADE_RANGE, vic, MOD_EXPLODE_SPLASH );
+  G_AdminsPrintf( "^3!explode: ^7%s^7 was blown up by ^7%s\n", vic->client->pers.netname, ( ent ) ? ent->client->pers.netname : "console" );
+
   return qtrue;
 }
 

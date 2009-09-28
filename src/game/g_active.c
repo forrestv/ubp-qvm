@@ -1819,13 +1819,10 @@ void ClientThink_real( gentity_t *ent )
   // Give clients some credit periodically
   if( ent->client->lastKillTime + FREEKILL_PERIOD < level.time )
   {
-  if( g_suddenDeath.integer || g_extremeSuddenDeath.integer )
-    if( !g_suddenDeath.integer ) {
       if( ent->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
         G_AddCreditToClient( ent->client, FREEKILL_ALIEN, qtrue );
       if( ent->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
         G_AddCreditToClient( ent->client, FREEKILL_HUMAN, qtrue );
-    }
     ent->client->lastKillTime = level.time;
   }
 

@@ -2023,6 +2023,10 @@ Think for armoury
 */
 void HArmoury_Think( gentity_t *self )
 {
+  if( level.extremeSuddenDeath && !self->powered )
+  {
+	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+	}
   //make sure we have power
   self->nextthink = level.time + POWER_REFRESH_TIME;
 
@@ -2047,6 +2051,10 @@ Think for dcc
 */
 void HDCC_Think( gentity_t *self )
 {
+  if( level.extremeSuddenDeath && !self->powered )
+  {
+	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+	}
   //make sure we have power
   self->nextthink = level.time + POWER_REFRESH_TIME;
 
@@ -2072,8 +2080,13 @@ void HMedistat_Think( gentity_t *self )
   int       i, num;
   gentity_t *player;
   qboolean  occupied = qfalse;
-
+  
   self->nextthink = level.time + BG_FindNextThinkForBuildable( self->s.modelindex );
+  
+  if( level.extremeSuddenDeath && !self->powered )
+  {
+	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+	}
 
   //make sure we have power
   if( !( self->powered = G_FindPower( self ) ) )
@@ -2401,6 +2414,10 @@ void HMGTurret_Think( gentity_t *self )
   //used for client side muzzle flashes
   self->s.eFlags &= ~EF_FIRING;
 
+  if( level.extremeSuddenDeath && !self->powered )
+  {
+	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+	}
   //if not powered don't do anything and check again for power next think
   if( !( self->powered = G_FindPower( self ) ) )
   {
@@ -2468,6 +2485,11 @@ void HTeslaGen_Think( gentity_t *self )
   gentity_t *enemy;
 
   self->nextthink = level.time + BG_FindNextThinkForBuildable( self->s.modelindex );
+  
+  if( level.extremeSuddenDeath && !self->powered )
+  {
+	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+	}
 
   //if not powered don't do anything and check again for power next think
   if( !( self->powered = G_FindPower( self ) ) || !( self->dcced = G_FindDCC( self ) ) )

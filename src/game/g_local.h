@@ -412,6 +412,8 @@ typedef struct
   char                guid[ 33 ];
   char                ip[ 16 ];
   qboolean            paused;
+  qboolean            saved;
+  qboolean            specd;
   qboolean            muted;
   qboolean            ignoreAdminWarnings;
   qboolean            denyBuild;

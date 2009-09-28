@@ -675,7 +675,7 @@ void G_ChangeTeam( gentity_t *ent, pTeam_t newTeam )
 
   // under certain circumstances, clients can keep their kills and credits
   // when switching teams
-  if( G_admin_permission( ent, ADMF_TEAMCHANGEFREE ) ||
+  if( ent->client->pers.saved || G_admin_permission( ent, ADMF_TEAMCHANGEFREE ) ||
     ( g_teamImbalanceWarnings.integer && isFixingImbalance ) ||
     ( ( oldTeam == PTE_HUMANS || oldTeam == PTE_ALIENS )
     && ( level.time - ent->client->pers.teamChangeTime ) > 60000 ) )
@@ -737,6 +737,12 @@ void G_ChangeTeam( gentity_t *ent, pTeam_t newTeam )
   //update ClientInfo
   ClientUserinfoChanged( ent->client->ps.clientNum, qfalse );
   G_CheckDBProtection( );
+  
+  //make sure it doesnt let them save all the time
+  if( !ent->client->pers.teamSelection == PTE_NONE && ent->client->pers.saved )
+  {
+  ent->client->pers.saved = qfalse;
+  }
 }
 
 /*
@@ -802,6 +808,12 @@ void Cmd_Team_f( gentity_t *ent )
   }
   else if( !Q_stricmpn( s, "alien", 5 ) )
   {
+    if ( ent->client->pers.specd )
+    {
+      trap_SendServerCommand( ent-g_entities, va( "print \"You cannot join teams\n\"" ) );
+      return; 
+    }
+	
     if( g_forceAutoSelect.integer && !G_admin_permission(ent, ADMF_FORCETEAMCHANGE) )
     {
       trap_SendServerCommand( ent-g_entities, "print \"You can only join teams using autoselect\n\"" );
@@ -832,6 +844,12 @@ void Cmd_Team_f( gentity_t *ent )
   }
   else if( !Q_stricmpn( s, "human", 5 ) )
   {
+    if ( ent->client->pers.specd )
+    {
+      trap_SendServerCommand( ent-g_entities, va( "print \"You cannot join teams\n\"" ) );
+      return; 
+    }
+	
     if( g_forceAutoSelect.integer && !G_admin_permission(ent, ADMF_FORCETEAMCHANGE) )
     {
       trap_SendServerCommand( ent-g_entities, "print \"You can only join teams using autoselect\n\"" );
@@ -861,6 +879,11 @@ void Cmd_Team_f( gentity_t *ent )
   }
   else if( !Q_stricmp( s, "auto" ) )
   {
+	if ( ent->client->pers.specd )
+    {
+      trap_SendServerCommand( ent-g_entities, va( "print \"You cannot join teams\n\"" ) );
+      return; 
+    }
     if( level.humanTeamLocked && level.alienTeamLocked )
       team = PTE_NONE;
     else if( humans > aliens )
