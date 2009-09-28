@@ -877,7 +877,7 @@ typedef enum
   IBE_MAXERRORS
 } itemBuildError_t;
 
-qboolean          AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provideExit );
+gentity_t         *AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provideExit );
 gentity_t         *G_CheckSpawnPoint( int spawnNum, vec3_t origin, vec3_t normal,
                     buildable_t spawn, vec3_t spawnOrigin );
 
