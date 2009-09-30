@@ -742,6 +742,7 @@ typedef struct
   qboolean          suddenDeath;
   qboolean          extremeSuddenDeath;
   int               suddenDeathBeginTime;
+  int               extremeSuddenDeathBeginTime;
   timeWarning_t     suddenDeathWarning;
   timeWarning_t     extremeSuddenDeathWarning;
   timeWarning_t     timelimitWarning;

@@ -1290,7 +1290,7 @@ provideExit makes it specific to player's class, and does it if possible
 */
 gentity_t *AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provideExit )
 {
-  vec3_t    forward, normal, origin, angles, hovelMins, hovelMaxs, origin2;
+  vec3_t    forward, normal, origin, hovelMins, hovelMaxs, origin2;
   vec3_t up = {0,0,1};
   float     displacement;
   trace_t   tr;
@@ -1333,6 +1333,7 @@ gentity_t *AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provide
 
   if( provideExit && player )
   {
+    vec3_t angles;
     player->client->ps.eFlags ^= EF_TELEPORT_BIT;
     player->client->ps.eFlags &= ~EF_NODRAW;
     G_UnlaggedClear( player );

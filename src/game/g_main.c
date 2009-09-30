@@ -781,6 +781,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
   trap_Cvar_Set( "g_suddenDeath", 0 );
   trap_Cvar_Set( "g_extremeSuddenDeath", 0 );
   level.suddenDeathBeginTime = g_suddenDeathTime.integer * 60000;
+  level.extremeSuddenDeathBeginTime = g_extremeSuddenDeathTime.integer * 60000;
 
   G_Printf( "-----------------------------------\n" );
 
@@ -1226,11 +1227,10 @@ G_TimeTilExtremeSuddenDeath
 */
 int G_TimeTilExtremeSuddenDeath( void )
 {
-	  if( !g_extremeSuddenDeathTime.integer )
-		      return 1; // Always some time away
+  if( (!g_extremeSuddenDeathTime.integer && level.extremeSuddenDeathBeginTime==0 ) || level.extremeSuddenDeathBeginTime<0 )
+    return 999999999; // Always some time away
 
-	    return ( g_extremeSuddenDeathTime.integer * 60000 ) -
-		             ( level.time - level.startTime );
+  return ( ( level.extremeSuddenDeathBeginTime ) - ( level.time - level.startTime ) );
 }
 
 #define PLAYER_COUNT_MOD 7.0f
@@ -1344,6 +1344,7 @@ if( !level.extremeSuddenDeath )
         for( i = 0; i < MAX_CLIENTS; i++ )
            level.clients[i].ps.persistant[PERS_CREDIT] = 2000;
 		   
+        level.extremeSuddenDeathBeginTime = level.time;
 		level.extremeSuddenDeath=qtrue;
         trap_Cvar_Set( "g_extremeSuddenDeath", "1" );   
         level.extremeSuddenDeathWarning = TW_PASSED;
@@ -2418,10 +2419,12 @@ void CheckVote( void )
 	
 	if( !Q_stricmp( level.voteString, "extremesuddendeath" ) )
     {
-      trap_Cvar_Set( "g_extremeSuddenDeath", "1" );
+      level.extremeSuddenDeathBeginTime = level.time + ( 1000 * g_suddenDeathVoteDelay.integer ) - level.startTime;
 
       level.voteString[0] = '\0';
 
+      if( g_suddenDeathVoteDelay.integer )
+        trap_SendServerCommand( -1, va("cp \"^1Extreme Sudden Death will begin in %d seconds\n\"", g_suddenDeathVoteDelay.integer  ) );
     }
 
     if( level.voteString[0] )
@@ -2687,6 +2690,7 @@ void CheckCvars( void )
   static int lastPasswordModCount   = -1;
   static int lastMarkDeconModCount  = -1;
   static int lastSDTimeModCount = -1;
+  static int lastESDTimeModCount = -1;
 
   if( g_password.modificationCount != lastPasswordModCount )
   {
@@ -2724,6 +2728,12 @@ void CheckCvars( void )
     lastSDTimeModCount = g_suddenDeathTime.modificationCount;
     level.suddenDeathBeginTime = g_suddenDeathTime.integer * 60000;
   }
+  if( g_extremeSuddenDeathTime.modificationCount != lastESDTimeModCount )
+  {
+    lastESDTimeModCount = g_extremeSuddenDeathTime.modificationCount;
+    level.extremeSuddenDeathBeginTime = g_extremeSuddenDeathTime.integer * 60000;
+  }
+
 
   level.frameMsec = trap_Milliseconds( );
 }
