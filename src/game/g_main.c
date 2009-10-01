@@ -90,6 +90,7 @@ vmCvar_t  g_voteLimit;
 vmCvar_t  g_suddenDeathVotePercent;
 vmCvar_t  g_suddenDeathVoteDelay;
 vmCvar_t  g_extremeSuddenDeathVotePercent;
+vmCvar_t  g_extremeSuddenDeathVoteDelay;
 vmCvar_t  g_mapVotesPercent;
 vmCvar_t  g_designateVotes;
 vmCvar_t  g_teamAutoJoin;
@@ -284,6 +285,7 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_suddenDeathVotePercent, "g_suddenDeathVotePercent", "60", CVAR_ARCHIVE, 0, qfalse },
   { &g_suddenDeathVoteDelay, "g_suddenDeathVoteDelay", "180", CVAR_ARCHIVE, 0, qfalse },
   { &g_extremeSuddenDeathVotePercent, "g_extremeSuddenDeathVotePercent", "75", CVAR_ARCHIVE, 0, qfalse },
+  { &g_extremeSuddenDeathVoteDelay, "g_extremeSuddenDeathVoteDelay", "30", CVAR_ARCHIVE, 0, qfalse },
   { &g_mapVotesPercent, "g_mapVotesPercent", "50", CVAR_ARCHIVE, 0, qfalse },
   { &g_designateVotes, "g_designateVotes", "0", CVAR_ARCHIVE, 0, qfalse },
   { &g_freeCredits, "g_freeCredits", "0", CVAR_ARCHIVE, 0, qfalse  },
@@ -2419,12 +2421,12 @@ void CheckVote( void )
 	
 	if( !Q_stricmp( level.voteString, "extremesuddendeath" ) )
     {
-      level.extremeSuddenDeathBeginTime = level.time + ( 1000 * g_suddenDeathVoteDelay.integer ) - level.startTime;
+      level.extremeSuddenDeathBeginTime = level.time + ( 1000 * g_extremeSuddenDeathVoteDelay.integer ) - level.startTime;
 
       level.voteString[0] = '\0';
 
-      if( g_suddenDeathVoteDelay.integer )
-        trap_SendServerCommand( -1, va("cp \"^1Extreme Sudden Death will begin in %d seconds\n\"", g_suddenDeathVoteDelay.integer  ) );
+      if( g_extremeSuddenDeathVoteDelay.integer )
+        trap_SendServerCommand( -1, va("cp \"^1Extreme Sudden Death will begin in %d seconds\n\"", g_extremeSuddenDeathVoteDelay.integer  ) );
     }
 
     if( level.voteString[0] )
