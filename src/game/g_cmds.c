@@ -1732,6 +1732,9 @@ void Cmd_CallVote_f( gentity_t *ent )
       "extremesuddendeath" );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
       "Begin extreme sudden death" );
+
+       if( g_extremeSuddenDeathVoteDelay.integer )
+         Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( " in %d seconds", g_extremeSuddenDeathVoteDelay.integer ) );
   }
   else if( !Q_stricmp( arg1, "map_restart" ) )
   {
