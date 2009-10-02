@@ -1771,7 +1771,7 @@ void ClientThink_real( gentity_t *ent )
 
       traceEnt = &g_entities[ trace.entityNum ];
 
-      if( traceEnt && (traceEnt->biteam == client->ps.stats[ STAT_PTEAM ] || ent->s.modelindex == BA_A_HOVEL ) && traceEnt->use )
+      if( traceEnt && (traceEnt->biteam == client->ps.stats[ STAT_PTEAM ] || traceEnt->s.modelindex == BA_A_HOVEL ) && traceEnt->use )
         traceEnt->use( traceEnt, ent, ent ); //other and activator are the same in this context
       else
       {
@@ -1785,7 +1785,7 @@ void ClientThink_real( gentity_t *ent )
         {
           traceEnt = &g_entities[ entityList[ i ] ];
 
-          if( traceEnt && (traceEnt->biteam == client->ps.stats[ STAT_PTEAM ] || ent->s.modelindex == BA_A_HOVEL ) && traceEnt->use )
+          if( traceEnt && (traceEnt->biteam == client->ps.stats[ STAT_PTEAM ] || traceEnt->s.modelindex == BA_A_HOVEL ) && traceEnt->use )
           {
             traceEnt->use( traceEnt, ent, ent ); //other and activator are the same in this context
             break;
