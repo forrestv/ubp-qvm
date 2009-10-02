@@ -1284,7 +1284,12 @@ AHovel_Blocked
 
 Is this hovel entrance blocked?
 
-provideExit makes it specific to player's class, and does it if possible
+player is NULL, provideExit is qfalse - check with max bbox
+    * used for antispawnblock
+player is not NULL, provideExit is qtrue - check with max bbox ignoring player
+    * used for building
+player is not NULL, provideExit is qtrue - check with player's bbox ignoring player and teleport
+    * used for hovel usage
 
 ================
 */
@@ -1294,16 +1299,15 @@ gentity_t *AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provide
   vec3_t up = {0,0,1};
   float     displacement;
   trace_t   tr;
-  vec3_t mins={-25,-25,-25}, maxs = {25,25,25};
+  vec3_t mins={-32,-32,-38}, maxs = {32,32,38};
   
   int entityPassNum = -1;
   int contentmask = CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY;
-  if ( player ) {
+  if ( player )
       entityPassNum = player->s.number;
-      if( provideExit )
-        BG_FindBBoxForClass( player->client->ps.stats[ STAT_PCLASS ],
+  if( provideExit && player )
+      BG_FindBBoxForClass( player->client->ps.stats[ STAT_PCLASS ],
                        mins, maxs, NULL, NULL, NULL );
-  }
 
   BG_FindBBoxForBuildable( BA_A_HOVEL, hovelMins, hovelMaxs );
 
@@ -1515,13 +1519,15 @@ void AHovel_Think( gentity_t *self )
           else if( self->spawnBlockTime && level.time - self->spawnBlockTime > 5000 )
           //five seconds of blocked by client and...
           {
-            vec3_t velocity;
-            //random direction
-            velocity[0] = crandom() * g_antiSpawnBlock.integer;
-            velocity[1] = crandom() * g_antiSpawnBlock.integer;
-            velocity[2] = crandom() * g_antiSpawnBlock.integer;
-                
-            VectorAdd( ent->client->ps.velocity, velocity, ent->client->ps.velocity );
+            vec3_t forward, right, up;
+            AngleVectors( self->s.angles, forward, NULL, NULL );
+            VectorInverse( forward );
+            MakeNormalVectors( forward, right, up );
+            
+            VectorMA( ent->client->ps.velocity, g_antiSpawnBlock.integer, forward, ent->client->ps.velocity );
+            VectorMA( ent->client->ps.velocity, crandom() * g_antiSpawnBlock.integer, right, ent->client->ps.velocity );
+            VectorMA( ent->client->ps.velocity, crandom() * g_antiSpawnBlock.integer, up, ent->client->ps.velocity );
+            
             trap_SendServerCommand( ent-g_entities, "cp \"Don't hovel block!\"" );
           }
           else if( !self->spawnBlockTime )
