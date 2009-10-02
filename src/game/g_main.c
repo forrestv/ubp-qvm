@@ -1358,7 +1358,8 @@ if( !level.extremeSuddenDeath )
 		if( G_TimeTilExtremeSuddenDeath( ) <= 60000 &&
         level.extremeSuddenDeathWarning < TW_IMMINENT )
 		{
-       trap_SendServerCommand( -1, "cp \"^1Extreme Sudden Death in 1 minute!\"" );
+       if( G_TimeTilExtremeSuddenDeath( ) >= 59000 ) // otherwise the vote will announce it
+         trap_SendServerCommand( -1, "cp \"^1Extreme Sudden Death in 1 minute!\"" );
        level.extremeSuddenDeathWarning = TW_IMMINENT;
 		}
    }
