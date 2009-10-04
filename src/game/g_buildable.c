@@ -3420,7 +3420,7 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int distance
         if( tempent->s.eType != ET_BUILDABLE )
           continue;
 
-        if( tempent->s.modelindex == buildable && !tempent->deconstruct )
+        if( tempent->s.modelindex == buildable && !tempent->deconstruct && tempent->biteam == PTE_ALIENS )
         {
           switch( buildable )
           {
@@ -3432,8 +3432,12 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int distance
               reason = IBE_HOVEL;
               break;
 
+            case BA_H_REACTOR:
+              reason = IBE_REACTOR;
+              break;
+
             default:
-              Com_Error( ERR_FATAL, "No reason for denying build of %d\n", buildable );
+              //Com_Error( ERR_FATAL, "No reason for denying build of %d\n", buildable );
               break;
           }
 
