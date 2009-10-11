@@ -3110,7 +3110,7 @@ void Cmd_Buy_f( gentity_t *ent )
       G_TriggerMenu( ent->client->ps.clientNum, MN_H_ITEMHELD );
       return;
     }
-/*
+
     // denyweapons
     if( weapon >= WP_PAIN_SAW && weapon <= WP_GRENADE &&
         ent->client->pers.denyHumanWeapons & ( 1 << (weapon - WP_BLASTER) ) )
@@ -3155,7 +3155,7 @@ void Cmd_Buy_f( gentity_t *ent )
       trap_SendServerCommand( ent-g_entities, va( "print \"You can't buy this item\n\"" ) );
       return;
     }
-*/
+
     //add to inventory
     BG_AddWeaponToInventory( weapon, ent->client->ps.stats );
     BG_FindAmmoForWeapon( weapon, &maxAmmo, &maxClips );
@@ -3183,7 +3183,7 @@ void Cmd_Buy_f( gentity_t *ent )
       G_TriggerMenu( ent->client->ps.clientNum, MN_H_ITEMHELD );
       return;
     }
-/*
+
     // denyweapons
     if( upgrade == UP_GRENADE &&
         ent->client->pers.denyHumanWeapons & ( 1 << (WP_GRENADE - WP_BLASTER) ) )
@@ -3235,7 +3235,7 @@ void Cmd_Buy_f( gentity_t *ent )
         va( "print \"You can't buy this item while crouching\n\"" ) );
       return;
     }
-*/
+
     if( upgrade == UP_AMMO )
       G_GiveClientMaxAmmo( ent, buyingEnergyAmmo );
     else
