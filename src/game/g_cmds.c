@@ -1429,7 +1429,6 @@ void Cmd_CallVote_f( gentity_t *ent )
   char  name[ MAX_NETNAME ];
   char *arg1plus;
   char *arg2plus;
-  char nullstring[] = "";
   char  message[ MAX_STRING_CHARS ];
   char targetname[ MAX_NAME_LENGTH] = "";
   char reason[ MAX_STRING_CHARS ] = "";
@@ -1837,7 +1836,7 @@ void Cmd_CallVote_f( gentity_t *ent )
         trap_SendServerCommand( ent-g_entities, "print \"callvote: You forgot to specify what people should vote on.\n\"" );
         return;
       }
-      Com_sprintf( level.voteString, sizeof( level.voteString ), nullstring);
+      level.voteString[0] = '\0';
       Com_sprintf( level.voteDisplayString,
           sizeof( level.voteDisplayString ), "[Poll] \'%s\'", arg2plus );
    }
@@ -1963,7 +1962,6 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
   char  arg2[ MAX_STRING_TOKENS ];
   int   clientNum = -1;
   char  name[ MAX_NETNAME ];
-  char nullstring[] = "";
   char  message[ MAX_STRING_CHARS ];
   char targetname[ MAX_NAME_LENGTH] = "";
   char reason[ MAX_STRING_CHARS ] = "";
@@ -2273,7 +2271,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
        trap_SendServerCommand( ent-g_entities, "print \"callteamvote: You forgot to specify what people should vote on.\n\"" );
        return;
      }
-     Com_sprintf( level.teamVoteString[ cs_offset ], sizeof( level.teamVoteString[ cs_offset ] ), nullstring );
+     level.teamVoteString[ cs_offset ][ 0 ] = '\0';
      Com_sprintf( level.teamVoteDisplayString[ cs_offset ],
          sizeof( level.voteDisplayString ), "[Poll] \'%s\'", arg2plus );
    }
@@ -3770,7 +3768,7 @@ void Cmd_TeamStatus_f( gentity_t *ent )
 {
   char multiple[ 12 ];
   int builders = 0;
-  int arm = 0, mediboost = 0;
+  int arm = 0, mediboost = 0, hovel = 0;
   int omrccount = 0, omrchealth = 0;
   qboolean omrcbuild = qfalse;
   gentity_t *tmp;
@@ -3833,6 +3831,9 @@ void Cmd_TeamStatus_f( gentity_t *ent )
           if( !omrcbuild )
             omrcbuild = tmp->spawned;
           break;
+        case BA_A_HOVEL:
+          hovel++;
+          break;
         case BA_H_ARMOURY:
           arm++;
           break;
@@ -3854,13 +3855,14 @@ void Cmd_TeamStatus_f( gentity_t *ent )
   if( ent->client->pers.teamSelection == PTE_ALIENS )
   {
     G_Say( ent, NULL, SAY_TEAM,
-      va( "^3OM: %s(%d)%s ^3Spawns: ^5%d ^3Builders: ^5%d ^3Boosters: ^5%d^7" ,
+      va( "^3OM: %s(%d)%s ^3Spawns: ^5%d ^3Builders: ^5%d ^3Grubs: ^5%d ^3Hovels: ^5%d^7" ,
       ( !omrccount ) ? "^1Down" : ( omrcbuild ) ? "^2Up" : "^5Building",
       omrchealth * 100 / OVERMIND_HEALTH,
       multiple,
       level.numAlienSpawns,
       builders,
-      mediboost ) );
+      mediboost,
+      hovel ) );
   }
   else
   {
@@ -4673,7 +4675,7 @@ commands_t cmds[ ] = {
   { "itemact", CMD_HUMAN|CMD_LIVING, Cmd_ActivateItem_f },
   { "itemdeact", CMD_HUMAN|CMD_LIVING, Cmd_DeActivateItem_f },
   { "itemtoggle", CMD_HUMAN|CMD_LIVING, Cmd_ToggleItem_f },
-  { "reload", CMD_HUMAN|CMD_LIVING, Cmd_Reload_f },
+  { "reload", CMD_TEAM|CMD_LIVING, Cmd_Reload_f },
   { "boost", 0, Cmd_Boost_f },
   { "share", CMD_TEAM, Cmd_Share_f },
   { "donate", CMD_TEAM, Cmd_Donate_f },
@@ -5074,7 +5076,7 @@ void G_PrivateMessage( gentity_t *ent )
       matches,
       color,
       msg,
-      ent ? ent-g_entities : -1 ) );
+      (int)(ent ? ent-g_entities : -1 ) ) );
 
     trap_SendServerCommand( pids[ i ], va( 
       "cp \"^%cprivate message from ^7%s^7\"", color,
