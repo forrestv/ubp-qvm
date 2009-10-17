@@ -1444,7 +1444,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
     int oldtake = take;
     
     targ = attacker;
-    take = take * FRAC_TO_ATTACKER;
+    take = take * 1.;
     
     if( take ) {
       //Do the damage
@@ -1472,7 +1472,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
     }
 
     targ = oldtarg;
-    take = take * 0;
+    take = take * 0.;
   }
 
   takeNoOverkill = take;
