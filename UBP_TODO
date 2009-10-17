@@ -6,6 +6,8 @@
     * limit to a certain distance/count
     * make a way to go backwards
     * more optimal path - TSP
+    * skip blocked hovels
+    * fix blockage - more force, faster
 * make override work - just fix up current patches
 * karma system
 * medi/arm rebuild in esd
@@ -16,3 +18,7 @@
 * bleed damage goes to shooter
 * vote for general cvars
 * grenade SD
+* reenable black in names
+* decon rc vote
+* vote changing
+* keep eggs/reps disabled in esd
