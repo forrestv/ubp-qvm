@@ -1439,6 +1439,42 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
       targ->health, take, asave );
   }
 
+  if( OnSameTeam( targ, attacker ) ) {
+    gentity_t *oldtarg = targ;
+    int oldtake = take;
+    
+    targ = attacker;
+    take = take * FRAC_TO_ATTACKER;
+    
+    if( take ) {
+      //Do the damage
+      targ->health = targ->health - take;
+
+      if( targ->client )
+        targ->client->ps.stats[ STAT_HEALTH ] = targ->health;
+
+      targ->lastDamageTime = level.time;
+
+      if( targ->health <= 0 )
+      {
+        if( client )
+          targ->flags |= FL_NO_KNOCKBACK;
+
+        if( targ->health < -999 )
+          targ->health = -999;
+
+        targ->enemy = attacker;
+        targ->die( targ, inflictor, attacker, take, mod );
+        return;
+      }
+      else if( targ->pain )
+        targ->pain( targ, attacker, take );
+    }
+
+    targ = oldtarg;
+    take = take * 0;
+  }
+
   takeNoOverkill = take;
   if( takeNoOverkill > targ->health ) 
   {
