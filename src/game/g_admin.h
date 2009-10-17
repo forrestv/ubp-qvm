@@ -118,6 +118,8 @@ typedef struct g_admin_admin
   char name[ MAX_NAME_LENGTH ];
   int level;
   char flags[ MAX_ADMIN_FLAGS ];
+  int seen;
+  char chat[ CHAT_MAXCHAN ][ CHAT_MAXPASS ];
 }
 g_admin_admin_t;
 
@@ -196,6 +198,8 @@ qboolean G_admin_adjustban( gentity_t *ent, int skiparg );
 qboolean G_admin_subnetban( gentity_t *ent, int skiparg );
 qboolean G_admin_ban( gentity_t *ent, int skiparg );
 qboolean G_admin_unban( gentity_t *ent, int skiparg );
+qboolean G_admin_seen(gentity_t *ent, int skiparg );
+void G_admin_seen_update( char *guid );
 qboolean G_admin_putteam( gentity_t *ent, int skiparg );
 qboolean G_admin_adminlog( gentity_t *ent, int skiparg );
 void G_admin_adminlog_cleanup( void );

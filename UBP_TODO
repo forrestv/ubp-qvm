@@ -8,11 +8,9 @@
     * more optimal path - TSP
     * skip blocked hovels
     * fix blockage - more force, faster
-* make override work - just fix up current patches
 * karma system
 * medi/arm rebuild in esd
 * make it so rc decon in esd doesn't explode everything
-* !seen
 * esd countdown
 * idle kick if server's full
 * bleed damage goes to shooter
