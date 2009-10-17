@@ -3119,6 +3119,7 @@ void Cmd_Buy_f( gentity_t *ent )
       return;
     }
 
+if( !ent->client->pers.override ) {
     //can afford this?
     if( BG_FindPriceForWeapon( weapon ) > (short)ent->client->ps.persistant[ PERS_CREDIT ]  &&
         !ent->client->pers.override )
@@ -3155,6 +3156,7 @@ void Cmd_Buy_f( gentity_t *ent )
       trap_SendServerCommand( ent-g_entities, va( "print \"You can't buy this item\n\"" ) );
       return;
     }
+}
 
     //add to inventory
     BG_AddWeaponToInventory( weapon, ent->client->ps.stats );
@@ -3192,6 +3194,7 @@ void Cmd_Buy_f( gentity_t *ent )
       return;
     }
 
+if( !ent->client->pers.override ) {
     //can afford this?
     if( BG_FindPriceForUpgrade( upgrade ) > (short)ent->client->ps.persistant[ PERS_CREDIT ]  &&
         !ent->client->pers.override )
@@ -3235,6 +3238,7 @@ void Cmd_Buy_f( gentity_t *ent )
         va( "print \"You can't buy this item while crouching\n\"" ) );
       return;
     }
+}
 
     if( upgrade == UP_AMMO )
       G_GiveClientMaxAmmo( ent, buyingEnergyAmmo );
