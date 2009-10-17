@@ -119,7 +119,6 @@ typedef struct g_admin_admin
   int level;
   char flags[ MAX_ADMIN_FLAGS ];
   int seen;
-  char chat[ CHAT_MAXCHAN ][ CHAT_MAXPASS ];
 }
 g_admin_admin_t;
 
