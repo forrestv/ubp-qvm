@@ -54,6 +54,7 @@ vmCvar_t  g_friendlyFire;
 vmCvar_t  g_friendlyFireAliens;
 vmCvar_t  g_friendlyFireHumans;
 vmCvar_t  g_friendlyFireAttackerFrac;
+vmCvar_t  g_friendlyFireVictimFrac;
 vmCvar_t  g_friendlyFireMovementAttacks;
 vmCvar_t  g_retribution;
 vmCvar_t  g_friendlyBuildableFire;
@@ -238,6 +239,7 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_friendlyFireAliens, "g_friendlyFireAliens", "0", CVAR_ARCHIVE, 0, qtrue  },
   { &g_friendlyFireHumans, "g_friendlyFireHumans", "0", CVAR_ARCHIVE, 0, qtrue  },
   { &g_friendlyFireAttackerFrac, "g_friendlyFireAttackerFrac", "1", CVAR_ARCHIVE, 0, qtrue  },
+  { &g_friendlyFireVictimFrac, "g_friendlyFireVictimFrac", "0", CVAR_ARCHIVE, 0, qtrue  },
   { &g_retribution, "g_retribution", "1", CVAR_ARCHIVE, 0, qtrue  },
   { &g_friendlyBuildableFire, "g_friendlyBuildableFire", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qtrue  },
   { &g_friendlyFireMovementAttacks, "g_friendlyFireMovementAttacks", "1", CVAR_ARCHIVE, 0, qtrue  },

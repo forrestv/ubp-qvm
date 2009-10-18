@@ -1425,10 +1425,12 @@ void Cmd_CallVote_f( gentity_t *ent )
   int   i;
   char  arg1[ MAX_STRING_TOKENS ];
   char  arg2[ MAX_STRING_TOKENS ];
+  char  arg3[ MAX_STRING_TOKENS ];
   int   clientNum = -1;
   char  name[ MAX_NETNAME ];
   char *arg1plus;
   char *arg2plus;
+  char *arg3plus;
   char  message[ MAX_STRING_CHARS ];
   char targetname[ MAX_NAME_LENGTH] = "";
   char reason[ MAX_STRING_CHARS ] = "";
@@ -1436,6 +1438,7 @@ void Cmd_CallVote_f( gentity_t *ent )
 
   arg1plus = G_SayConcatArgs( 1 );
   arg2plus = G_SayConcatArgs( 2 );
+  arg3plus = G_SayConcatArgs( 3 );
 
   if( !g_allowVote.integer )
   {
@@ -1489,6 +1492,7 @@ void Cmd_CallVote_f( gentity_t *ent )
   // make sure it is a valid command to vote on
   trap_Argv( 1, arg1, sizeof( arg1 ) );
   trap_Argv( 2, arg2, sizeof( arg2 ) );
+  trap_Argv( 3, arg3, sizeof( arg3 ) );
 
   if( strchr( arg1plus, ';' ) )
   {
@@ -1840,10 +1844,37 @@ void Cmd_CallVote_f( gentity_t *ent )
       Com_sprintf( level.voteDisplayString,
           sizeof( level.voteDisplayString ), "[Poll] \'%s\'", arg2plus );
    }
+   else if( !Q_stricmp( arg1, "setff" ) )
+    {
+      int val1=-1, val2=-2;
+      if( sscanf(arg2plus, "%i %i", &val1, &val2) != 2 )
+      {
+        trap_SendServerCommand( ent-g_entities, "print \"callvote: use /callvote setff <AttackerPercent> <VictimPercent>\n\"" );
+        return;
+      }
+      
+      if ( val1 < 0 || val1 > 100 || val2 < 0 || val2 > 100)
+      {
+        trap_SendServerCommand( ent-g_entities, "print \"callvote: invalid argument - numbers must be between 0 and 100\n\"" );
+        return;
+      }
+      
+      if ( val1 + val2 < 100)
+      {
+        trap_SendServerCommand( ent-g_entities, "print \"callvote: AttackerPercent + VictimPercent must be more than or equal to 100%\n\"" );
+        return;
+      }
+      
+      Com_sprintf( level.voteString, sizeof( level.voteString ), "g_friendlyFireAttackerFrac %f;g_friendlyFireVictimFrac %f", .01*val1, .01*val2 );
+      Com_sprintf( level.voteDisplayString,
+          sizeof( level.voteDisplayString ), "Change friendly fire to %i%% to attacker and %i%% to victim", val1, val2 );
+    level.votePassThreshold = 75;
+   }
   else
   {
     trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string\n\"" );
     trap_SendServerCommand( ent-g_entities, "print \"Valid vote commands are: "
+      "setff, "
       "map, map_restart, draw, nextmap, kick, mute, unmute, poll, extreme_sudden_death, and sudden_death\n" );
     return;
   }

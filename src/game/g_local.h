@@ -1279,6 +1279,7 @@ extern  vmCvar_t  g_friendlyFire;
 extern  vmCvar_t  g_friendlyFireHumans;
 extern  vmCvar_t  g_friendlyFireAliens;
 extern  vmCvar_t  g_friendlyFireAttackerFrac;
+extern  vmCvar_t  g_friendlyFireVictimFrac;
 extern  vmCvar_t  g_retribution;
 extern  vmCvar_t  g_friendlyFireMovementAttacks;
 extern  vmCvar_t  g_friendlyBuildableFire;

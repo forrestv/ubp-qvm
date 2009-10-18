@@ -1475,7 +1475,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
     }
 
     targ = oldtarg;
-    take = oldtake * (1. - g_friendlyFireAttackerFrac.value);
+    take = oldtake * g_friendlyFireVictimFrac.value;
   }
 
   takeNoOverkill = take;
