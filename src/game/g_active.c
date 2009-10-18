@@ -512,7 +512,7 @@ Returns qfalse if the client is dropped
 */
 qboolean ClientInactivityTimer( gclient_t *client )
 {
-  if( ! g_inactivity.integer )
+  if( ! g_inactivity.integer || G_admin_permission( &g_entities[ client->ps.clientNum ], ADMF_IMMUNITY ) )
   {
     // give everyone some time, so if the operator sets g_inactivity during
     // gameplay, everyone isn't kicked
@@ -522,6 +522,8 @@ qboolean ClientInactivityTimer( gclient_t *client )
   else if( client->pers.cmd.forwardmove ||
            client->pers.cmd.rightmove ||
            client->pers.cmd.upmove ||
+           client->pers.teamSelection != PTE_NONE ||
+           level.numFreeSlots || 
            ( client->pers.cmd.buttons & BUTTON_ATTACK ) )
   {
     client->inactivityTime = level.time + g_inactivity.integer * 1000;
@@ -1460,6 +1462,10 @@ void ClientThink_real( gentity_t *ent )
   if( client->pers.teamSelection != PTE_NONE && client->pers.joinedATeam )
     G_UpdatePTRConnection( client );
 
+  // check for inactivity timer, but never drop the local client of a non-dedicated server
+  if( !ClientInactivityTimer( client ) )
+    return;
+
   // spectators don't do much
   if( client->sess.sessionTeam == TEAM_SPECTATOR )
   {
@@ -1469,10 +1475,6 @@ void ClientThink_real( gentity_t *ent )
     SpectatorThink( ent, ucmd );
     return;
   }
-
-  // check for inactivity timer, but never drop the local client of a non-dedicated server
-  if( !ClientInactivityTimer( client ) )
-    return;
 
   // calculate where ent is currently seeing all the other active clients 
   G_UnlaggedCalc( ent->client->unlaggedTime, ent );

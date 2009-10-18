@@ -53,6 +53,7 @@ vmCvar_t  g_capturelimit;
 vmCvar_t  g_friendlyFire;
 vmCvar_t  g_friendlyFireAliens;
 vmCvar_t  g_friendlyFireHumans;
+vmCvar_t  g_friendlyFireAttackerFrac;
 vmCvar_t  g_friendlyFireMovementAttacks;
 vmCvar_t  g_retribution;
 vmCvar_t  g_friendlyBuildableFire;
@@ -60,6 +61,7 @@ vmCvar_t  g_password;
 vmCvar_t  g_needpass;
 vmCvar_t  g_maxclients;
 vmCvar_t  g_maxGameClients;
+vmCvar_t  g_privateClients;
 vmCvar_t  g_dedicated;
 vmCvar_t  g_speed;
 vmCvar_t  g_gravity;
@@ -91,6 +93,7 @@ vmCvar_t  g_suddenDeathVotePercent;
 vmCvar_t  g_suddenDeathVoteDelay;
 vmCvar_t  g_extremeSuddenDeathVotePercent;
 vmCvar_t  g_extremeSuddenDeathVoteDelay;
+vmCvar_t  g_extremeSuddenDeathAutoSpec;
 vmCvar_t  g_mapVotesPercent;
 vmCvar_t  g_designateVotes;
 vmCvar_t  g_teamAutoJoin;
@@ -219,6 +222,7 @@ static cvarTable_t   gameCvarTable[ ] =
 
   { &g_maxclients, "sv_maxclients", "8", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
   { &g_maxGameClients, "g_maxGameClients", "0", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue  },
+  { &g_privateClients, "sv_privateClients", "0", CVAR_SERVERINFO | CVAR_LATCH | CVAR_ARCHIVE, 0, qfalse  },
 
   // change anytime vars
   { &g_timelimit, "timelimit", "45", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
@@ -233,6 +237,7 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_friendlyFire, "g_friendlyFire", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qtrue  },
   { &g_friendlyFireAliens, "g_friendlyFireAliens", "0", CVAR_ARCHIVE, 0, qtrue  },
   { &g_friendlyFireHumans, "g_friendlyFireHumans", "0", CVAR_ARCHIVE, 0, qtrue  },
+  { &g_friendlyFireAttackerFrac, "g_friendlyFireAttackerFrac", "1", CVAR_ARCHIVE, 0, qtrue  },
   { &g_retribution, "g_retribution", "1", CVAR_ARCHIVE, 0, qtrue  },
   { &g_friendlyBuildableFire, "g_friendlyBuildableFire", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qtrue  },
   { &g_friendlyFireMovementAttacks, "g_friendlyFireMovementAttacks", "1", CVAR_ARCHIVE, 0, qtrue  },
@@ -266,7 +271,7 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_quadfactor, "g_quadfactor", "3", 0, 0, qtrue  },
   { &g_weaponRespawn, "g_weaponrespawn", "5", 0, 0, qtrue  },
   { &g_weaponTeamRespawn, "g_weaponTeamRespawn", "30", 0, 0, qtrue },
-  { &g_inactivity, "g_inactivity", "0", 0, 0, qtrue },
+  { &g_inactivity, "g_inactivity", "20", 0, 0, qtrue },
   { &g_debugMove, "g_debugMove", "0", 0, 0, qfalse },
   { &g_debugDamage, "g_debugDamage", "0", 0, 0, qfalse },
   { &g_debugAlloc, "g_debugAlloc", "0", 0, 0, qfalse },
@@ -286,6 +291,7 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_suddenDeathVoteDelay, "g_suddenDeathVoteDelay", "180", CVAR_ARCHIVE, 0, qfalse },
   { &g_extremeSuddenDeathVotePercent, "g_extremeSuddenDeathVotePercent", "75", CVAR_ARCHIVE, 0, qfalse },
   { &g_extremeSuddenDeathVoteDelay, "g_extremeSuddenDeathVoteDelay", "30", CVAR_ARCHIVE, 0, qfalse },
+  { &g_extremeSuddenDeathAutoSpec, "g_extremeSuddenDeathAutoSpec", "1", CVAR_ARCHIVE, 0, qfalse },
   { &g_mapVotesPercent, "g_mapVotesPercent", "50", CVAR_ARCHIVE, 0, qfalse },
   { &g_designateVotes, "g_designateVotes", "0", CVAR_ARCHIVE, 0, qfalse },
   { &g_freeCredits, "g_freeCredits", "0", CVAR_ARCHIVE, 0, qfalse  },
@@ -1359,9 +1365,17 @@ if( !level.extremeSuddenDeath )
         level.extremeSuddenDeathWarning < TW_IMMINENT )
 		{
        if( G_TimeTilExtremeSuddenDeath( ) >= 59000 ) // otherwise the vote will announce it
-         trap_SendServerCommand( -1, "cp \"^1Extreme Sudden Death in 1 minute!\"" );
+         trap_SendServerCommand( -1, va("cp \"^1Extreme Sudden Death in %d seconds!\"", 
+               (int)(G_TimeTilExtremeSuddenDeath() / 1000 ) ) );
        level.extremeSuddenDeathWarning = TW_IMMINENT;
 		}
+		if( G_TimeTilExtremeSuddenDeath( ) < 10000 && G_TimeTilExtremeSuddenDeath( ) >= 0 ) {
+		     int secs = (int)(G_TimeTilExtremeSuddenDeath() / 1000 )+1;
+		 if( secs == 1 )
+           trap_SendServerCommand( -1, va("cp \"^1Extreme Sudden Death in %d second!\"", secs) );
+         else
+           trap_SendServerCommand( -1, va("cp \"^1Extreme Sudden Death in %d seconds!\"", secs) );
+        }
    }
    }
   
@@ -1616,6 +1630,11 @@ void CalculateRanks( void )
   level.numHumanClients = 0;
   level.numLiveAlienClients = 0;
   level.numLiveHumanClients = 0;
+  level.numFreeSlots = 0;
+
+  for( i = g_privateClients.integer; i < level.maxclients; i++ )
+    if ( level.clients[ i ].pers.connected == CON_DISCONNECTED )
+      level.numFreeSlots++;
 
   for( i = 0; i < level.maxclients; i++ )
   {

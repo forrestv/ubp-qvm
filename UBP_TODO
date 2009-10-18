@@ -11,12 +11,17 @@
 * karma system
 * medi/arm rebuild in esd
 * make it so rc decon in esd doesn't explode everything
-* esd countdown
-* idle kick if server's full
-* bleed damage goes to shooter
 * vote for general cvars
 * grenade SD
 * reenable black in names
 * decon rc vote
 * vote changing
 * keep eggs/reps disabled in esd
+* player controlled turrets
+
+DONE
+* autospec dead in esd
+* bleed damage goes to shooter
+* idle kick if server's full
+* !seen
+* esd countdown

@@ -703,6 +703,9 @@ finish_dying: // from MOD_SLAP
   }
 
   trap_LinkEntity( self );
+  
+  if( level.extremeSuddenDeath && g_extremeSuddenDeathAutoSpec.integer )
+    G_ChangeTeam( self, PTE_NONE );
 }
 
 
@@ -1444,7 +1447,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
     int oldtake = take;
     
     targ = attacker;
-    take = take * 1.;
+    take = take * g_friendlyFireAttackerFrac.value;
     
     if( take ) {
       //Do the damage
@@ -1472,7 +1475,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
     }
 
     targ = oldtarg;
-    take = take * 0.;
+    take = oldtake * (1. - g_friendlyFireAttackerFrac.value);
   }
 
   takeNoOverkill = take;

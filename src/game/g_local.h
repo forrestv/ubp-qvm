@@ -784,6 +784,8 @@ typedef struct
   
   statsCounters_level alienStatsCounters;
   statsCounters_level humanStatsCounters;
+  
+  int               numFreeSlots;
 } level_locals_t;
 
 #define CMD_CHEAT         0x01
@@ -1258,6 +1260,7 @@ extern  vmCvar_t  g_dedicated;
 extern  vmCvar_t  g_cheats;
 extern  vmCvar_t  g_maxclients;     // allow this many total, including spectators
 extern  vmCvar_t  g_maxGameClients;   // allow this many active
+extern  vmCvar_t  g_privateClients;
 extern  vmCvar_t  g_restarted;
 extern  vmCvar_t  g_lockTeamsAtStart;
 extern  vmCvar_t  g_minCommandPeriod;
@@ -1275,6 +1278,7 @@ extern  vmCvar_t  g_extremeSuddenDeath;
 extern  vmCvar_t  g_friendlyFire;
 extern  vmCvar_t  g_friendlyFireHumans;
 extern  vmCvar_t  g_friendlyFireAliens;
+extern  vmCvar_t  g_friendlyFireAttackerFrac;
 extern  vmCvar_t  g_retribution;
 extern  vmCvar_t  g_friendlyFireMovementAttacks;
 extern  vmCvar_t  g_friendlyBuildableFire;
@@ -1303,6 +1307,7 @@ extern  vmCvar_t  g_suddenDeathVotePercent;
 extern  vmCvar_t  g_suddenDeathVoteDelay;
 extern  vmCvar_t  g_extremeSuddenDeathVotePercent;
 extern  vmCvar_t  g_extremeSuddenDeathVoteDelay;
+extern  vmCvar_t  g_extremeSuddenDeathAutoSpec;
 extern  vmCvar_t  g_mapVotesPercent;
 extern  vmCvar_t  g_designateVotes;
 extern  vmCvar_t  g_teamAutoJoin;
