@@ -1504,8 +1504,7 @@ void AHovel_Think( gentity_t *self )
           G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
           return;
         }
-        else if( g_antiSpawnBlock.integer && ent->client && 
-                 ent->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
+        else if( g_antiSpawnBlock.integer && ent->client )
        {
           //spawnblock protection
           if( self->spawnBlockTime && level.time - self->spawnBlockTime > 10000 )
@@ -1516,17 +1515,18 @@ void AHovel_Think( gentity_t *self )
             self->spawnBlockTime += 2000;
             //inappropriate MOD but prints an apt obituary
           }
-          else if( self->spawnBlockTime && level.time - self->spawnBlockTime > 5000 )
+          else if( self->spawnBlockTime && level.time - self->spawnBlockTime > 2000 )
           //five seconds of blocked by client and...
           {
             vec3_t forward, right, up;
+            int force = 1000;
             AngleVectors( self->s.angles, forward, NULL, NULL );
             VectorInverse( forward );
             MakeNormalVectors( forward, right, up );
             
-            VectorMA( ent->client->ps.velocity, g_antiSpawnBlock.integer, forward, ent->client->ps.velocity );
-            VectorMA( ent->client->ps.velocity, crandom() * g_antiSpawnBlock.integer, right, ent->client->ps.velocity );
-            VectorMA( ent->client->ps.velocity, crandom() * g_antiSpawnBlock.integer, up, ent->client->ps.velocity );
+            VectorMA( ent->client->ps.velocity, force, forward, ent->client->ps.velocity );
+            VectorMA( ent->client->ps.velocity, crandom() * force, right, ent->client->ps.velocity );
+            VectorMA( ent->client->ps.velocity, crandom() * force, up, ent->client->ps.velocity );
             
             trap_SendServerCommand( ent-g_entities, "cp \"Don't hovel block!\"" );
           }

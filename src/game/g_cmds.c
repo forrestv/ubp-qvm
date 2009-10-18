@@ -1859,9 +1859,9 @@ void Cmd_CallVote_f( gentity_t *ent )
         return;
       }
       
-      if ( val1 + val2 < 100)
+      if ( val1 + val2 < 33)
       {
-        trap_SendServerCommand( ent-g_entities, "print \"callvote: AttackerPercent + VictimPercent must be more than or equal to 100%\n\"" );
+        trap_SendServerCommand( ent-g_entities, "print \"callvote: AttackerPercent + VictimPercent must be more than or equal to 33%\n\"" );
         return;
       }
       

@@ -18,10 +18,10 @@
 * vote changing
 * keep eggs/reps disabled in esd
 * player controlled turrets
+* autospec people initially dead in esd
 
 DONE
 * autospec dead in esd
 * bleed damage goes to shooter
 * idle kick if server's full
 * !seen
-* esd countdown
