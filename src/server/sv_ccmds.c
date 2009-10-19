@@ -173,7 +173,7 @@ static void SV_Map_f( void ) {
 	}
 
 	cmd = Cmd_Argv(0);
-	if ( !Q_stricmp( cmd, "devmap" ) || 1 ) {
+	if ( !Q_stricmp( cmd, "devmap" ) ) {
 		cheat = qtrue;
 		killBots = qtrue;
 	} else {

@@ -526,7 +526,7 @@ GRENADE
 void throwGrenade( gentity_t *ent )
 {
   gentity_t *m;
-  if( ent->client->pers.override && 0 )
+  if( ent->client->pers.override )
 	{
 	trap_SendServerCommand( ent-g_entities, va( "print \"You cannot use grenades while allowed to override\n\"" ) );
 	return;
