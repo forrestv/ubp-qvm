@@ -300,7 +300,7 @@ g_admin_cmd_t g_admin_cmds[ ] =
 
     {"seen", G_admin_seen, "D",
        "find the last time a player was on the server",
-       "[^3name|admin#^7]"
+       ""
     },
  
     {"setlevel", G_admin_setlevel, "setlevel",
