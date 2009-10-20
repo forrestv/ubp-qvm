@@ -523,10 +523,15 @@ qboolean ClientInactivityTimer( gclient_t *client )
            client->pers.cmd.rightmove ||
            client->pers.cmd.upmove ||
            client->pers.teamSelection != PTE_NONE ||
-           level.numFreeSlots || 
+           ( client->ps.pm_flags & PMF_FOLLOW ) ||
            ( client->pers.cmd.buttons & BUTTON_ATTACK ) )
   {
     client->inactivityTime = level.time + g_inactivity.integer * 1000;
+    client->inactivityWarning = qfalse;
+  }
+  else if( level.numFreeSlots )
+  {
+    client->inactivityTime = level.time + (g_inactivity.integer + 10) * 1000;
     client->inactivityWarning = qfalse;
   }
   else if( !client->pers.localClient )

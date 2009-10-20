@@ -4736,6 +4736,9 @@ void ClientCommand( int clientNum )
     return;   // not fully in game yet
 
   trap_Argv( 0, cmd, sizeof( cmd ) );
+  
+  if ( Q_stricmp( cmd, "score" ) != 0 ) 
+    ent->client->inactivityTime = level.time + g_inactivity.integer * 1000;
 
   for( i = 0; i < numCmds; i++ )
   {
