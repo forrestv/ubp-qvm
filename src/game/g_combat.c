@@ -1442,7 +1442,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
       targ->health, take, asave );
   }
 
-  if( OnSameTeam( targ, attacker ) ) {
+  if( OnSameTeam( targ, attacker ) && targ != attacker ) {
     gentity_t *oldtarg = targ;
     int oldtake = take;
     
