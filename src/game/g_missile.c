@@ -45,7 +45,11 @@ void G_BounceMissile( gentity_t *ent, trace_t *trace )
 
   if( ent->s.eFlags & EF_BOUNCE_HALF )
   {
-    VectorScale( ent->s.pos.trDelta, 0.65, ent->s.pos.trDelta );
+	  if(!strcmp(ent->classname,"grenade") && g_proximityMines.integer) {
+		  VectorScale( ent->s.pos.trDelta, 0.00, ent->s.pos.trDelta );
+	  } else {
+		  VectorScale( ent->s.pos.trDelta, 0.65, ent->s.pos.trDelta );
+	  }
     // check for stop
     if( trace->plane.normal[ 2 ] > 0.2 && VectorLength( ent->s.pos.trDelta ) < 40 )
     {
@@ -58,7 +62,6 @@ void G_BounceMissile( gentity_t *ent, trace_t *trace )
   VectorCopy( ent->r.currentOrigin, ent->s.pos.trBase );
   ent->s.pos.trTime = level.time;
 }
-
 
 /*
 ================
@@ -95,6 +98,40 @@ void G_ExplodeMissile( gentity_t *ent )
                     ent->splashRadius, ent, ent->splashMethodOfDeath );
 
   trap_LinkEntity( ent );
+}
+
+/*
+================
+G_ProcessProximityMine
+
+If an enemy is close to the entity, go boom!
+================
+*/
+void G_ProcessProximityMine(gentity_t *ent) {
+	int i, total_entities, entityList[MAX_GENTITIES];
+	vec3_t range, mins, maxs;
+	gentity_t *target;
+	
+	// Set the next time to run this check (can be overwritten below)
+	ent->nextthink = level.time + PROXIMITY_CHECK_FREQUENCY;
+	
+	// Grab all entities around us
+	VectorSet(range, PROXIMITY_RANGE, PROXIMITY_RANGE, PROXIMITY_RANGE);
+	VectorAdd(ent->s.origin, range, maxs);
+	VectorSubtract(ent->s.origin, range, mins);
+	
+	total_entities = trap_EntitiesInBox(mins, maxs, entityList, MAX_GENTITIES);
+	
+	// Loop entities looking for an enemy body
+	for(i=0; i<total_entities; i++) {
+		target = &g_entities[entityList[i]];
+		if(target->client && target->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS) {
+			// Found an enemy, boom time!
+			ent->nextthink = level.time + PROXIMITY_BOOM_TIME;
+			ent->think = G_ExplodeMissile;
+			return;
+		}
+	}
 }
 
 void AHive_ReturnToHive( gentity_t *self );
@@ -491,8 +528,13 @@ gentity_t *launch_grenade( gentity_t *self, vec3_t start, vec3_t dir )
 
   bolt = G_Spawn( );
   bolt->classname = "grenade";
-  bolt->nextthink = level.time + 5000;
-  bolt->think = G_ExplodeMissile;
+  if(g_proximityMines.integer) {
+	  bolt->nextthink = level.time + PROXIMITY_INIT_TIME;
+	  bolt->think = G_ProcessProximityMine;
+  } else {
+	  bolt->nextthink = level.time + 5000;
+	  bolt->think = G_ExplodeMissile;
+  }
   bolt->s.eType = ET_MISSILE;
   bolt->r.svFlags = SVF_USE_CURRENT_ORIGIN;
   bolt->s.weapon = WP_GRENADE;
@@ -803,7 +845,8 @@ gentity_t *fire_bounceBall( gentity_t *self, vec3_t start, vec3_t dir )
   VectorScale( dir, LEVEL3_BOUNCEBALL_SPEED, bolt->s.pos.trDelta );
   SnapVector( bolt->s.pos.trDelta );      // save net bandwidth
   VectorCopy( start, bolt->r.currentOrigin );
-  /*bolt->s.eFlags |= EF_BOUNCE;*/
+  if( g_blobBounce.integer )
+    bolt->s.eFlags |= EF_BOUNCE;
 
   return bolt;
 }

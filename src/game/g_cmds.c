@@ -1496,13 +1496,15 @@ void Cmd_CallVote_f( gentity_t *ent )
 
   if( strchr( arg1plus, ';' ) )
   {
-    trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string\n\"" );
     return;
   }
 
   // if there is still a vote to be executed
   if( level.voteExecuteTime )
   {
+    trap_SendServerCommand( ent-g_entities, "print \"A vote is being executed.\n\"" );
+    return;
+
     if( !Q_stricmp( level.voteString, "map_restart" ) )
     {
       G_admin_maplog_result( "r" );
@@ -1630,6 +1632,7 @@ void Cmd_CallVote_f( gentity_t *ent )
       return;
     }
 
+       level.votePassThreshold = 66;
     // use ip in case this player disconnects before the vote ends
     Com_sprintf( level.voteString, sizeof( level.voteString ),
       "!ban %s \"%s\" vote kick", level.clients[ clientNum ].pers.ip,
@@ -1658,6 +1661,7 @@ void Cmd_CallVote_f( gentity_t *ent )
       G_admin_adminlog_log( ent, "vote", NULL, 0, qfalse );
       return;
     }
+       level.votePassThreshold = 60;
     Com_sprintf( level.voteString, sizeof( level.voteString ),
       "!mute %i", clientNum );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
@@ -1671,6 +1675,7 @@ void Cmd_CallVote_f( gentity_t *ent )
         "print \"callvote: player is not currently muted\n\"" );
       return;
     }
+       level.votePassThreshold = 60;
     Com_sprintf( level.voteString, sizeof( level.voteString ),
       "!unmute %i", clientNum );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
@@ -1853,9 +1858,9 @@ void Cmd_CallVote_f( gentity_t *ent )
         return;
       }
       
-      if ( val1 < 0 || val1 > 100 || val2 < 0 || val2 > 100)
+      if ( val1 < 0 || val2 < 0 || val2 > 100)
       {
-        trap_SendServerCommand( ent-g_entities, "print \"callvote: invalid argument - numbers must be between 0 and 100\n\"" );
+        trap_SendServerCommand( ent-g_entities, "print \"callvote: invalid argument - 0 <= AttackerPercent, 0 <= VictimPercent <= 100\n\"" );
         return;
       }
       
@@ -1870,11 +1875,25 @@ void Cmd_CallVote_f( gentity_t *ent )
           sizeof( level.voteDisplayString ), "Change friendly fire to %i%% to attacker and %i%% to victim", val1, val2 );
     level.votePassThreshold = 75;
    }
+   else if( !Q_stricmp( arg1, "minesblobs" ) )
+    {
+    if (g_proximityMines.integer && g_blobBounce.integer) {
+      Com_sprintf( level.voteString, sizeof( level.voteString ), "g_proximityMines 0;g_blobBounce 0" );
+      Com_sprintf( level.voteDisplayString,
+          sizeof( level.voteDisplayString ), "Disable proximity mines and bouncing blobs");
+     } else {
+      Com_sprintf( level.voteString, sizeof( level.voteString ), "g_proximityMines 1;g_blobBounce 1" );
+      Com_sprintf( level.voteDisplayString,
+          sizeof( level.voteDisplayString ), "Enable proximity mines and bouncing blobs");
+    level.votePassThreshold = 75;
+    }
+   }
   else
   {
     trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string\n\"" );
     trap_SendServerCommand( ent-g_entities, "print \"Valid vote commands are: "
       "setff, "
+      "minesblobs, "
       "map, map_restart, draw, nextmap, kick, mute, unmute, poll, extreme_sudden_death, and sudden_death\n" );
     return;
   }
@@ -3081,6 +3100,8 @@ void Cmd_Buy_f( gentity_t *ent )
   qboolean  buyingEnergyAmmo = qfalse;
   qboolean  hasEnergyWeapon = qfalse;
   
+   BG_UpdateWeaponData(g_proximityMines.integer);
+   BG_UpdateUpgradeData(g_proximityMines.integer);
 
   for( i = UP_NONE; i < UP_NUM_UPGRADES; i++ )
   {

@@ -80,6 +80,8 @@ vmCvar_t  g_synchronousClients;
 vmCvar_t  g_warmup;
 vmCvar_t  g_warmupMode;
 vmCvar_t  g_doWarmup;
+vmCvar_t  g_proximityMines;
+vmCvar_t  g_blobBounce;
 vmCvar_t  g_restarted;
 vmCvar_t  g_lockTeamsAtStart;
 vmCvar_t  g_logFile;
@@ -255,6 +257,8 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_warmup, "g_warmup", "10", CVAR_ARCHIVE, 0, qtrue  },
   { &g_warmupMode, "g_warmupMode", "1", CVAR_ARCHIVE, 0, qtrue  },
   { &g_doWarmup, "g_doWarmup", "1", CVAR_ARCHIVE, 0, qtrue  },
+  { &g_proximityMines, "g_proximityMines", "0", 0, 0, qtrue  },
+  { &g_blobBounce, "g_blobBounce", "0", 0, 0, qtrue  },
   { &g_logFile, "g_logFile", "games.log", CVAR_ARCHIVE, 0, qfalse  },
   { &g_logFileSync, "g_logFileSync", "0", CVAR_ARCHIVE, 0, qfalse  },
 

@@ -1300,6 +1300,8 @@ extern  vmCvar_t  g_motd;
 extern  vmCvar_t  g_warmup;
 extern  vmCvar_t  g_warmupMode;
 extern  vmCvar_t  g_doWarmup;
+extern  vmCvar_t  g_proximityMines;
+extern  vmCvar_t  g_blobBounce;
 extern  vmCvar_t  g_blood;
 extern  vmCvar_t  g_allowVote;
 extern  vmCvar_t  g_requireVoteReasons;

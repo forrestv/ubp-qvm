@@ -370,6 +370,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define GRENADE_RANGE               192.0f
 #define GRENADE_SPEED               400.0f
 
+// Proximity Mine settings
+#define	PROXIMITY_INIT_TIME			3000
+#define PROXIMITY_RANGE				100
+#define PROXIMITY_CHECK_FREQUENCY	100
+#define	PROXIMITY_BOOM_TIME			20
+#define PROXIMITY_PRICE				800
+
 #define SHOTGUN_PRICE               150
 #define SHOTGUN_SHELLS              8
 #define SHOTGUN_PELLETS             8 //used to sync server and client side
