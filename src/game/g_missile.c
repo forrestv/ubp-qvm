@@ -36,12 +36,16 @@ void G_BounceMissile( gentity_t *ent, trace_t *trace )
   vec3_t  velocity;
   float dot;
   int   hitTime;
+  float cor = 1.;
+
+  if( !strcmp( ent->classname, "bounceball" ) )
+    cor = .8;
 
   // reflect the velocity on the trace plane
   hitTime = level.previousTime + ( level.time - level.previousTime ) * trace->fraction;
   BG_EvaluateTrajectoryDelta( &ent->s.pos, hitTime, velocity );
   dot = DotProduct( velocity, trace->plane.normal );
-  VectorMA( velocity, -2 * dot, trace->plane.normal, ent->s.pos.trDelta );
+  VectorMA( velocity, -(1+cor) * dot, trace->plane.normal, ent->s.pos.trDelta );
 
   if( ent->s.eFlags & EF_BOUNCE_HALF )
   {
@@ -125,7 +129,7 @@ void G_ProcessProximityMine(gentity_t *ent) {
 	// Loop entities looking for an enemy body
 	for(i=0; i<total_entities; i++) {
 		target = &g_entities[entityList[i]];
-		if(target->client && target->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS) {
+		if(((target->client && target->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS) || !strcmp(target->classname, "slowblob")) && CanDamage(target, ent->s.origin)) {
 			// Found an enemy, boom time!
 			ent->nextthink = level.time + PROXIMITY_BOOM_TIME;
 			ent->think = G_ExplodeMissile;
@@ -150,6 +154,16 @@ void G_MissileImpact( gentity_t *ent, trace_t *trace )
 
   other = &g_entities[ trace->entityNum ];
   attacker = &g_entities[ ent->r.ownerNum ];
+
+  if( !other->takedamage &&
+      !strcmp( ent->classname, "bounceball" ) &&
+      ( ent->s.eFlags & ( EF_BOUNCE | EF_BOUNCE_HALF ) ) )
+  {
+    G_BounceMissile( ent, trace );
+    G_AddEvent( ent, EV_MISSILE_MISS, 0 );
+
+    return;
+  }
 
   // check for bounce
   if( !other->takedamage &&
@@ -845,8 +859,10 @@ gentity_t *fire_bounceBall( gentity_t *self, vec3_t start, vec3_t dir )
   VectorScale( dir, LEVEL3_BOUNCEBALL_SPEED, bolt->s.pos.trDelta );
   SnapVector( bolt->s.pos.trDelta );      // save net bandwidth
   VectorCopy( start, bolt->r.currentOrigin );
-  if( g_blobBounce.integer )
+  if( g_blobBounce.integer ) {
     bolt->s.eFlags |= EF_BOUNCE;
+    bolt->nextthink = level.time + 2000;
+  }
 
   return bolt;
 }
