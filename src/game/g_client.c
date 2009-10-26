@@ -1650,6 +1650,7 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, vec3_t origin, vec3_t angles
   vec3_t              up = { 0.0f, 0.0f, 1.0f };
   int                 maxAmmo, maxClips;
   weapon_t            weapon;
+  int oldstate = ent->client->ps.stats[ STAT_STATE ];
 
 
   index = ent - g_entities;
@@ -1820,6 +1821,8 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, vec3_t origin, vec3_t angles
   {
     ent->health *= ent->client->pers.evolveHealthFraction;
     client->ps.stats[ STAT_HEALTH ] *= ent->client->pers.evolveHealthFraction;
+    if( oldstate & SS_BOOSTED )
+        ent->client->ps.stats[ STAT_STATE ] |= SS_BOOSTED;
   }
 
   //clear the credits array
