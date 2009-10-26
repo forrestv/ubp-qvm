@@ -248,7 +248,7 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_devmapNoGod, "g_devmapNoGod", "1", CVAR_ARCHIVE, 0, qtrue  },
   { &g_devmapNoStructDmg, "g_devmapNoStructDmg", "0", CVAR_ARCHIVE, 0, qtrue  },
 
-  { &g_slapKnockback, "g_slapKnockback", "200", CVAR_ARCHIVE, 0, qfalse},
+  { &g_slapKnockback, "g_slapKnockback", "300", CVAR_ARCHIVE, 0, qfalse},
   { &g_slapDamage, "g_slapDamage", "5", CVAR_ARCHIVE, 0, qfalse},
 
   { &g_teamAutoJoin, "g_teamAutoJoin", "0", CVAR_ARCHIVE  },
