@@ -328,7 +328,7 @@ buildableAttributes_t bg_buildableList[ ] =
     qfalse,                //qboolean  dccTest;
     qfalse,                //qboolean  transparentTest;
     qfalse,                 //qboolean  reactorTest;
-    qfalse,                //qboolean  replacable;
+    qtrue,                //qboolean  replacable;
   },
   {
     BA_H_SPAWN,            //int       buildNum;

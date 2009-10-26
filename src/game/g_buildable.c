@@ -3553,6 +3553,19 @@ qboolean G_BuildingExists( int bclass )
 {
   int               i;
   gentity_t         *tempent;
+  if( bclass == BA_A_HOVEL ) {
+    int count = 0;
+    for (i = 1, tempent = g_entities + i; i < level.num_entities; i++, tempent++ )
+    {
+      if( tempent->s.eType != ET_BUILDABLE )
+       continue;
+      if( tempent->s.modelindex == bclass && tempent->health > 0 )
+      {
+        count++;
+      }
+    }
+    return count > 1;
+  }
   //look for an Armoury
   for (i = 1, tempent = g_entities + i; i < level.num_entities; i++, tempent++ )
   {
