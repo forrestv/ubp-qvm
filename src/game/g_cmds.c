@@ -1873,7 +1873,7 @@ void Cmd_CallVote_f( gentity_t *ent )
       Com_sprintf( level.voteString, sizeof( level.voteString ), "g_friendlyFireAttackerFrac %f;g_friendlyFireVictimFrac %f", .01*val1, .01*val2 );
       Com_sprintf( level.voteDisplayString,
           sizeof( level.voteDisplayString ), "Change friendly fire to %i%% to attacker and %i%% to victim", val1, val2 );
-    level.votePassThreshold = 75;
+    level.votePassThreshold = 60;
    }
    else if( !Q_stricmp( arg1, "minesblobs" ) )
     {
