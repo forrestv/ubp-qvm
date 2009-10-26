@@ -1858,9 +1858,9 @@ void Cmd_CallVote_f( gentity_t *ent )
         return;
       }
       
-      if ( val1 < 0 || val2 < 0 || val2 > 100)
+      if ( val1 < 0 || val1 > 100 || val2 < 0 || val2 > 100)
       {
-        trap_SendServerCommand( ent-g_entities, "print \"callvote: invalid argument - 0 <= AttackerPercent, 0 <= VictimPercent <= 100\n\"" );
+        trap_SendServerCommand( ent-g_entities, "print \"callvote: invalid argument - 0 <= AttackerPercent <= 100, 0 <= VictimPercent <= 100\n\"" );
         return;
       }
       

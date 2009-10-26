@@ -1821,8 +1821,10 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, vec3_t origin, vec3_t angles
   {
     ent->health *= ent->client->pers.evolveHealthFraction;
     client->ps.stats[ STAT_HEALTH ] *= ent->client->pers.evolveHealthFraction;
-    if( oldstate & SS_BOOSTED )
-        ent->client->ps.stats[ STAT_STATE ] |= SS_BOOSTED;
+    if( oldstate & SS_BOOSTED ) {
+    ent->client->ps.stats[ STAT_STATE ] |= SS_BOOSTED;
+    ent->client->lastBoostedTime = level.time;
+}
   }
 
   //clear the credits array

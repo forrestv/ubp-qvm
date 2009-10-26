@@ -1329,15 +1329,16 @@ gentity_t *AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provide
   if( tr.entityNum != ENTITYNUM_NONE )
     return &g_entities[ tr.entityNum ];
   
-  trap_Trace( &tr, origin2, mins, maxs, origin, entityPassNum, contentmask );
-  VectorCopy( tr.endpos, origin );
-  
-  VectorMA( origin, -25, up, origin );
-  VectorMA( origin, -mins[2], up, origin );
-
   if( provideExit && player )
   {
     vec3_t angles;
+    
+    trap_Trace( &tr, origin2, mins, maxs, origin, entityPassNum, contentmask );
+    VectorCopy( tr.endpos, origin );
+
+    VectorMA( origin, -25, up, origin );
+    VectorMA( origin, -mins[2], up, origin );
+
     player->client->ps.eFlags ^= EF_TELEPORT_BIT;
     player->client->ps.eFlags &= ~EF_NODRAW;
     G_UnlaggedClear( player );
@@ -1674,14 +1675,14 @@ void ABooster_Touch( gentity_t *self, gentity_t *other, trace_t *trace )
     return;
 
   //only allow boostage once every 30 seconds
-  if( client->lastBoostedTime + BOOSTER_INTERVAL > level.time )
-    return;
+  //if( client->lastBoostedTime + BOOSTER_INTERVAL > level.time )
+  //  return;
 
-  if( !( client->ps.stats[ STAT_STATE ] & SS_BOOSTED ) )
-  {
+  //if( !( client->ps.stats[ STAT_STATE ] & SS_BOOSTED ) )
+  //{
     client->ps.stats[ STAT_STATE ] |= SS_BOOSTED;
     client->lastBoostedTime = level.time;
-  }
+  //}
 }
 
 
