@@ -69,7 +69,7 @@ buildableAttributes_t bg_buildableList[ ] =
     qfalse,                //qboolean  dccTest;
     qfalse,                //qboolean  transparentTest;
     qfalse,                //qboolean  reactorTest;
-    qfalse,                //qboolean  replacable;
+    qtrue,                //qboolean  replacable;
   },
   {
     BA_A_BARRICADE,        //int       buildNum;
@@ -365,7 +365,7 @@ buildableAttributes_t bg_buildableList[ ] =
     qfalse,                //qboolean  dccTest;
     qtrue,                 //qboolean  transparentTest;
     qfalse,                //qboolean  reactorTest;
-    qfalse,                //qboolean  replacable;
+    qtrue,                //qboolean  replacable;
   },
   {
     BA_H_MEDISTAT,         //int       buildNum;
