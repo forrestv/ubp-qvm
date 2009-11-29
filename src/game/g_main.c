@@ -1151,6 +1151,7 @@ void G_SpawnClients( pTeam_t team )
   spawnQueue_t  *sq = NULL;
   int           numSpawns = 0;
   if( g_doWarmup.integer && ( g_warmupMode.integer==1 || g_warmupMode.integer == 2 ) &&
+      !g_extremeSuddenDeath.integer &&
       level.time - level.startTime < g_warmup.integer * 1000 )
   {
     return;
@@ -1490,6 +1491,17 @@ if( !level.extremeSuddenDeath )
           g_alienStage.integer, g_humanStage.integer,
           g_alienKills.integer, g_humanKills.integer,
           alienNextStageThreshold, humanNextStageThreshold ) );
+  }
+  {
+    int i;
+    gentity_t *ent = &g_entities[ 0 ];
+
+    for( i = 0; i < MAX_CLIENTS; i++, ent++ )
+    {
+      if( !ent->inuse )
+        continue;
+      a
+    }
   }
 }
 

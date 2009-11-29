@@ -20,6 +20,12 @@
 * player controlled turrets
 * autospec people initially dead in esd
 * vote to delay sd/esd
+* grenades
+  * disable in esd
+  * 3 min life
+  * cost up
+* instant-heal on medi/booster for creds - 200/1
+
 
 DONE
 * autospec dead in esd
