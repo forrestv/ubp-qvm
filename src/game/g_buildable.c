@@ -4627,6 +4627,28 @@ void G_BaseSelfDestruct( pTeam_t team )
   }
 }
 
+void G_BaseMove( pTeam_t team )
+{
+  int       i;
+  gentity_t *ent;
+
+  for( i = MAX_CLIENTS; i < level.num_entities; i++ )
+  {
+    ent = &level.gentities[ i ];
+    if( ent->health <= 0 )
+      continue;
+    if( ent->s.eType != ET_BUILDABLE )
+      continue;
+    if( team == PTE_HUMANS && ent->biteam != BIT_HUMANS )
+      continue;
+    if( team == PTE_ALIENS && ent->biteam != BIT_ALIENS )
+      continue;
+    if( ent->s.modelindex != BA_A_OVERMIND && ent->s.modelindex != BA_H_REACTOR )
+      continue;
+    G_FreeEntity( ent );
+  }
+}
+
  int G_LogBuild( buildHistory_t *new )
  { 
    new->next = level.buildHistory;
