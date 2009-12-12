@@ -152,6 +152,11 @@ g_admin_cmd_t g_admin_cmds[ ] =
       "force a player to remain on the spectator team",
       "[^3name|slot#^7]"
     },
+	
+	{"forcespawn", G_admin_forcespawn, "specme",
+      "force a player to spawn at the admin's current position",
+      "[^3name|slot#^7]"
+    },
 
     {"unforcespec", G_admin_unforcespec, "forcespec",
       "allow a player to join a team besides spectators",
@@ -6729,6 +6734,56 @@ vic->client->pers.specd = qfalse;
 CPx( pids[ 0 ], "cp \"^1You can now join teams\"" );
 //tell everyone that it was removed
 AP( va( "print \"^3!unforcespec: ^7%s^7 has allowed joining of teams for ^7%s\n\"", ( ent ) ? ent->client->pers.netname : "console", vic->client->pers.netname ) );
+        return qtrue;
+
+}
+
+
+qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
+{
+  int pids[ MAX_CLIENTS ];
+  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
+  int minargc;
+  gentity_t *vic;
+
+
+    minargc = 2 + skiparg;
+
+  if( G_SayArgc() < minargc )
+  {
+    ADMP( "^3!forcespawn: ^7usage: !forcespawn [name|slot#]\n" );
+    return qfalse;
+  }
+  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
+
+  if( G_ClientNumbersFromString( name, pids ) != 1 )
+  {
+    G_MatchOnePlayer( pids, err, sizeof( err ) );
+    ADMP( va( "^3!forcespawn: ^7%s\n", err ) );
+    return qfalse;
+  }
+
+  vic = &g_entities[ pids[ 0 ] ];
+if (vic->client->pers.teamSelection == PTE_NONE )
+ {
+ ADMP( "^3!forcespawn: ^7player not on a team\n" );
+
+        return qfalse;
+ }
+ if ( vic->client->pers.classSelection != PCL_NONE && 0)
+ {
+ ADMP( "^3!forcespawn: ^7player already spawned\n" );
+
+        return qfalse;
+ }
+
+        ClientUserinfoChanged( pids[ 0 ], qtrue );
+              vic->client->sess.sessionTeam = TEAM_FREE;
+
+vic->client->pers.classSelection = vic->client->pers.teamSelection == PTE_HUMANS ? PCL_HUMAN : PCL_ALIEN_LEVEL0;
+vic->client->pers.evolveHealthFraction = 1.;
+VectorCopy( ent->s.origin, vic->s.pos.trBase );
+ClientSpawn(vic, vic, vic->s.pos.trBase, ent->client ? ent->client->ps.viewangles : ent->s.angles2 ); // ent->s.apos.trBase
         return qtrue;
 
 }
