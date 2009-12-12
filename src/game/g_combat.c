@@ -1442,12 +1442,21 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
       targ->health, take, asave );
   }
 
+  takeNoOverkill = take;
+  if( takeNoOverkill > targ->health )
+  {
+    if(targ->health > 0)
+      takeNoOverkill = targ->health;
+    else
+      takeNoOverkill = 0;
+  }
+
   if( OnSameTeam( targ, attacker ) && targ != attacker ) {
     gentity_t *oldtarg = targ;
     int oldtake = take;
     
     targ = attacker;
-    take = take * g_friendlyFireAttackerFrac.value;
+    take = takeNoOverkill * g_friendlyFireAttackerFrac.value;
     
     if( take ) {
       //Do the damage
