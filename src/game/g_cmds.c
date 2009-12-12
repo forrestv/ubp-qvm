@@ -4724,9 +4724,18 @@ void Cmd_Getff_f( gentity_t *ent )
 {
   trap_SendServerCommand( ent - g_entities,
       va( "print \"Friendly fire is set to %i%% to attacker and %i%% to victim\n\"" , (int)(100.*g_friendlyFireAttackerFrac.value+.5), (int)(100.*g_friendlyFireVictimFrac.value+.5) ) );
-  trap_SendServerCommand( ent - g_entities,
-      va( "print \"1\n\"" ) );
 }
+
+void Cmd_Mods_f( gentity_t *ent )
+{
+  trap_SendServerCommand( ent - g_entities,
+      va( "print \"Friendly fire is set to %i%% to attacker and %i%% to victim\n\"" , (int)(100.*g_friendlyFireAttackerFrac.value+.5), (int)(100.*g_friendlyFireVictimFrac.value+.5) ) );
+  trap_SendServerCommand( ent - g_entities,
+      va( "print \"Prox mines: %i Blob bounce: %i\n\"" , g_proximityMines.integer, g_blobBounce.integer ) );
+  trap_SendServerCommand( ent - g_entities,
+      va( "print \"Teamvoted RC decon is always enabled\n\"" ) );
+}
+
 
 commands_t cmds[ ] = {
   // normal commands
@@ -4793,6 +4802,7 @@ commands_t cmds[ ] = {
   { "resign", CMD_TEAM, Cmd_Resign_f },
   { "builder", 0, Cmd_Builder_f },
   { "getff", 0, Cmd_Getff_f },
+  { "mods", 0, Cmd_Mods_f },
 };
 static int numCmds = sizeof( cmds ) / sizeof( cmds[ 0 ] );
 
