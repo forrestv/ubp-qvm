@@ -153,7 +153,7 @@ g_admin_cmd_t g_admin_cmds[ ] =
       "[^3name|slot#^7]"
     },
 	
-	{"forcespawn", G_admin_forcespawn, "specme",
+	{"forcespawn", G_admin_forcespawn, "forcespawn",
       "force a player to spawn at the admin's current position",
       "[^3name|slot#^7]"
     },
@@ -6777,10 +6777,14 @@ if (vic->client->pers.teamSelection == PTE_NONE )
         return qfalse;
  }
 
-        ClientUserinfoChanged( pids[ 0 ], qtrue );
-              vic->client->sess.sessionTeam = TEAM_FREE;
+player_die(vic, NULL, NULL, 0, MOD_SUICIDE );
 
-vic->client->pers.classSelection = vic->client->pers.teamSelection == PTE_HUMANS ? PCL_HUMAN : PCL_ALIEN_LEVEL0;
+
+//        ClientUserinfoChanged( pids[ 0 ], qtrue );
+//              vic->client->sess.sessionTeam = TEAM_FREE;
+
+vic->client->pers.classSelection = (vic->client->pers.teamSelection == PTE_HUMANS) ? PCL_HUMAN : PCL_ALIEN_BUILDER0;
+vic->client->pers.humanItemSelection = WP_HBUILD;
 vic->client->pers.evolveHealthFraction = 1.;
 VectorCopy( ent->s.origin, vic->s.pos.trBase );
 ClientSpawn(vic, vic, vic->s.pos.trBase, ent->client ? ent->client->ps.viewangles : ent->s.angles2 ); // ent->s.apos.trBase
