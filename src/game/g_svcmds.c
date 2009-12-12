@@ -576,6 +576,33 @@ static void Svcmd_AdmitDefeat_f( void )
   } 
 }
 
+static void Svcmd_BaseMove_f( void )
+{
+  int  team;
+  char teamNum[ 2 ];
+
+  if( trap_Argc( ) != 2 )
+  {
+    G_Printf("basemove: must provide a team\n");
+    return;
+  }
+  trap_Argv( 1, teamNum, sizeof( teamNum ) );
+  team = atoi( teamNum );
+  if( team == PTE_ALIENS || teamNum[ 0 ] == 'a' )
+  {
+    G_BaseMove( PTE_ALIENS );
+  }
+  else if( team == PTE_HUMANS || teamNum[ 0 ] == 'h' )
+  {
+    G_BaseMove( PTE_HUMANS );
+  }
+  else
+  {
+    G_Printf("admitdefeat: invalid team\n");
+  }
+}
+
+
 /*
 =================
 ConsoleCommand
@@ -693,6 +720,13 @@ qboolean  ConsoleCommand( void )
     Svcmd_AdmitDefeat_f( );
     return qtrue;
   }
+
+  if( !Q_stricmp( cmd, "basemove" ) )
+  {
+    Svcmd_BaseMove_f( );
+    return qtrue;
+  }
+
 
   if( !Q_stricmp( cmd, "evacuation" ) )
   {

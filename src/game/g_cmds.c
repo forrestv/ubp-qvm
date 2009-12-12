@@ -2325,12 +2325,20 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
      Com_sprintf( level.teamVoteDisplayString[ cs_offset ],
          sizeof( level.voteDisplayString ), "[Poll] \'%s\'", arg2plus );
    }
+   else if( !Q_stricmp( arg1, "basemove" ) )
+   {
+    Com_sprintf( level.teamVoteString[ cs_offset ],
+      sizeof( level.teamVoteString[ cs_offset ] ), "basemove %i", team );
+    Com_sprintf( level.teamVoteDisplayString[ cs_offset ],
+        sizeof( level.teamVoteDisplayString[ cs_offset ] ),
+        "Decon RC/OM for base move" );
+   }
   else
   {
     trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string\n\"" );
     trap_SendServerCommand( ent-g_entities,
        "print \"Valid team vote commands are: "
-       "kick, denybuild, allowbuild, poll, designate, undesignate, and admitdefeat\n\"" );
+       "basemove, kick, denybuild, allowbuild, poll, designate, undesignate, and admitdefeat\n\"" );
     return;
   }
   ent->client->pers.voteCount++;
@@ -2820,6 +2828,32 @@ void DBCommand( gentity_t *builder, pTeam_t team, const char *text )
   }
 }
 
+// Tell everyone on the team text, with it being flood limited to builder
+void BuilderTeamCommand( gentity_t *builder, pTeam_t team, const char *text )
+{
+  int i;
+  gentity_t *ent;
+  if( g_floodMinTime.integer && G_Flood_Limited( builder ) )
+  {
+    trap_SendServerCommand( builder-g_entities,
+      "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
+    return;
+  }
+
+  for( i = 0, ent = g_entities + i; i < level.maxclients; i++, ent++ )
+  {
+    if( !ent->client || ent->client->pers.connected != CON_CONNECTED )
+      continue;
+
+    if( ( ent->client->pers.teamSelection == team ) ||
+      ( ent->client->pers.teamSelection == PTE_NONE &&
+        G_admin_permission( ent, ADMF_SPEC_ALLCHAT ) ) )
+    {
+      trap_SendServerCommand( i, text );
+    }
+  }
+}
+
 /*
 =================
 Cmd_Destroy_f
@@ -2905,6 +2939,19 @@ void Cmd_Destroy_f( gentity_t *ent )
           if( level.numHumanSpawns <= 1 )
             return;
         }
+      }
+
+      // Disable reactor/om decon, tell player to use vote, and warn team
+      if( traceEnt->s.modelindex == BA_H_REACTOR || traceEnt->s.modelindex == BA_A_OVERMIND ) {
+        BuilderTeamCommand( ent, ent->client->pers.teamSelection,
+          va( "print \"%s^3 has attempted to decon the %s!\n\"",
+            ent->client->pers.netname,
+            BG_FindHumanNameForBuildable( traceEnt->s.modelindex ) ) );
+        trap_SendServerCommand( ent-g_entities,
+          "print \"Use '/callteamvote basemove'"
+          " to deconstruct the Reactor or Overmind\n\"" );
+
+        return;
       }
 
       // Don't allow destruction of hovel with granger inside
@@ -4677,6 +4724,8 @@ void Cmd_Getff_f( gentity_t *ent )
 {
   trap_SendServerCommand( ent - g_entities,
       va( "print \"Friendly fire is set to %i%% to attacker and %i%% to victim\n\"" , (int)(100.*g_friendlyFireAttackerFrac.value+.5), (int)(100.*g_friendlyFireVictimFrac.value+.5) ) );
+  trap_SendServerCommand( ent - g_entities,
+      va( "print \"1\n\"" ) );
 }
 
 commands_t cmds[ ] = {
