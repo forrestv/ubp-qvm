@@ -2828,32 +2828,6 @@ void DBCommand( gentity_t *builder, pTeam_t team, const char *text )
   }
 }
 
-// Tell everyone on the team text, with it being flood limited to builder
-void BuilderTeamCommand( gentity_t *builder, pTeam_t team, const char *text )
-{
-  int i;
-  gentity_t *ent;
-  if( g_floodMinTime.integer && G_Flood_Limited( builder ) )
-  {
-    trap_SendServerCommand( builder-g_entities,
-      "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
-    return;
-  }
-
-  for( i = 0, ent = g_entities + i; i < level.maxclients; i++, ent++ )
-  {
-    if( !ent->client || ent->client->pers.connected != CON_CONNECTED )
-      continue;
-
-    if( ( ent->client->pers.teamSelection == team ) ||
-      ( ent->client->pers.teamSelection == PTE_NONE &&
-        G_admin_permission( ent, ADMF_SPEC_ALLCHAT ) ) )
-    {
-      trap_SendServerCommand( i, text );
-    }
-  }
-}
-
 /*
 =================
 Cmd_Destroy_f
@@ -2943,10 +2917,14 @@ void Cmd_Destroy_f( gentity_t *ent )
 
       // Disable reactor/om decon, tell player to use vote, and warn team
       if( traceEnt->s.modelindex == BA_H_REACTOR || traceEnt->s.modelindex == BA_A_OVERMIND ) {
-        BuilderTeamCommand( ent, ent->client->pers.teamSelection,
-          va( "print \"%s^3 has attempted to decon the %s!\n\"",
-            ent->client->pers.netname,
-            BG_FindHumanNameForBuildable( traceEnt->s.modelindex ) ) );
+        if( g_floodMinTime.integer && G_Flood_Limited( ent ) )
+          trap_SendServerCommand( ent-g_entities,
+            "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
+        else
+          G_TeamCommand( ent->client->pers.teamSelection,
+            va( "print \"%s^3 has attempted to decon the %s!\n\"",
+              ent->client->pers.netname,
+              BG_FindHumanNameForBuildable( traceEnt->s.modelindex ) ) );
         trap_SendServerCommand( ent-g_entities,
           "print \"Use '/callteamvote basemove'"
           " to deconstruct the Reactor or Overmind\n\"" );

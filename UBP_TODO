@@ -26,6 +26,8 @@
   * cost up
 * instant-heal on medi/booster for creds - 200/1
 * drop gren on death
+* callteamvote kick removes from team
+* vote to revert rc/om behavior for game
 
 DONE
 * autospec dead in esd
