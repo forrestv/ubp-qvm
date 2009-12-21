@@ -374,8 +374,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define	PROXIMITY_INIT_TIME			3000
 #define PROXIMITY_RANGE				100
 #define PROXIMITY_CHECK_FREQUENCY	100
-#define	PROXIMITY_BOOM_TIME			20
-#define PROXIMITY_PRICE				500
+#define	PROXIMITY_BOOM_TIME			250
+#define PROXIMITY_PRICE				400
 
 #define SHOTGUN_PRICE               150
 #define SHOTGUN_SHELLS              8

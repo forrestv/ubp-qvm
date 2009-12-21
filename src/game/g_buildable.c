@@ -1685,6 +1685,29 @@ void ABooster_Touch( gentity_t *self, gentity_t *other, trace_t *trace )
   //}
 }
 
+void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
+{
+  if( self->health <= 0 )
+    return;
+
+  if( !self->spawned )
+    return;
+
+  if( other ) {
+    int cost = 2;
+    if( other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) cost = 2000 * 2 / 9;
+    if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * 4 / 3 ) return;
+    if( other->client->ps.persistant[ PERS_CREDIT ] < cost ) {
+          trap_SendServerCommand( other-g_entities,
+               "print \"Not enough funds\n\"" );
+          return;
+        }
+
+    G_AddCreditToClient( other->client, -(short)cost, qfalse );
+
+    other->health = other->client->ps.stats[ STAT_MAX_HEALTH ] * 4 / 3;
+  }
+}
 
 
 
@@ -2150,7 +2173,7 @@ void HMedistat_Think( gentity_t *self )
     if( player->flags & FL_NOTARGET )
       continue; // notarget cancels even beneficial effects?
 
-        if( player->client && player->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
+        if( player->client && ( player->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS || player->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS ) )
         {
           if( player->health < player->client->ps.stats[ STAT_MAX_HEALTH ] &&
               player->client->ps.pm_type != PM_DEAD )
@@ -3693,6 +3716,7 @@ static gentity_t *G_Build( gentity_t *builder, buildable_t buildable, vec3_t ori
       built->think = ABarricade_Think;
       built->pain = ABarricade_Pain;
       built->touch = ABooster_Touch;
+      built->use = ABooster_Use;
       break;
 
     case BA_A_ACIDTUBE:
@@ -3755,6 +3779,7 @@ static gentity_t *G_Build( gentity_t *builder, buildable_t buildable, vec3_t ori
     case BA_H_MEDISTAT:
       built->think = HMedistat_Think;
       built->die = HSpawn_Die;
+      built->use = ABooster_Use;
       break;
 
     case BA_H_REACTOR:

@@ -870,10 +870,10 @@ void ClientTimerActions( gentity_t *ent, int msec )
           for( i = 0; i < MAX_CLIENTS; i++ )
             ent->client->tkcredits[ i ] = 0;
         }
-      }
-
       if( ent->health > client->ps.stats[ STAT_MAX_HEALTH ] )
         ent->health = client->ps.stats[ STAT_MAX_HEALTH ];
+      }
+
     }
     
     
@@ -931,9 +931,9 @@ void ClientTimerActions( gentity_t *ent, int msec )
     }
   }
 
-  while( client->time10000 >= 10000 )
+  while( client->time10000 >= 10000 * (g_blobBounce.integer ? .4 : 1. ) )
   {
-    client->time10000 -= 10000;
+    client->time10000 -= 10000 * (g_blobBounce.integer ? .4 : 1. );
 
     if( client->ps.weapon == WP_ALEVEL3_UPG )
     {
@@ -1545,7 +1545,7 @@ void ClientThink_real( gentity_t *ent )
   {
     //if currently using a medkit or have no need for a medkit now
     if( client->ps.stats[ STAT_STATE ] & SS_MEDKIT_ACTIVE ||
-        ( client->ps.stats[ STAT_HEALTH ] == client->ps.stats[ STAT_MAX_HEALTH ] &&
+        ( client->ps.stats[ STAT_HEALTH ] >= client->ps.stats[ STAT_MAX_HEALTH ] &&
           !( client->ps.stats[ STAT_STATE ] & SS_POISONED ) ) )
     {
       BG_DeactivateUpgrade( UP_MEDKIT, client->ps.stats );
