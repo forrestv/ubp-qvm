@@ -4769,9 +4769,9 @@ commands_t cmds[ ] = {
 
   { "buy", CMD_HUMAN|CMD_LIVING, Cmd_Buy_f },
   { "sell", CMD_HUMAN|CMD_LIVING, Cmd_Sell_f },
-  { "itemact", CMD_HUMAN|CMD_LIVING, Cmd_ActivateItem_f },
-  { "itemdeact", CMD_HUMAN|CMD_LIVING, Cmd_DeActivateItem_f },
-  { "itemtoggle", CMD_HUMAN|CMD_LIVING, Cmd_ToggleItem_f },
+  { "itemact", CMD_TEAM|CMD_LIVING, Cmd_ActivateItem_f },
+  { "itemdeact", CMD_TEAM|CMD_LIVING, Cmd_DeActivateItem_f },
+  { "itemtoggle", CMD_TEAM|CMD_LIVING, Cmd_ToggleItem_f },
   { "reload", CMD_TEAM|CMD_LIVING, Cmd_Reload_f },
   { "boost", 0, Cmd_Boost_f },
   { "share", CMD_TEAM, Cmd_Share_f },
