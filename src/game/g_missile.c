@@ -856,13 +856,14 @@ gentity_t *fire_bounceBall( gentity_t *self, vec3_t start, vec3_t dir )
   bolt->s.pos.trType = TR_GRAVITY;
   bolt->s.pos.trTime = level.time - MISSILE_PRESTEP_TIME;   // move a bit on the very first frame
   VectorCopy( start, bolt->s.pos.trBase );
+  if( g_blobBounce.integer ) {
+    VectorScale( dir, 1.5, dir );
+    bolt->s.eFlags |= EF_BOUNCE;
+    bolt->nextthink = level.time + 4000;
+  }
   VectorScale( dir, LEVEL3_BOUNCEBALL_SPEED, bolt->s.pos.trDelta );
   SnapVector( bolt->s.pos.trDelta );      // save net bandwidth
   VectorCopy( start, bolt->r.currentOrigin );
-  if( g_blobBounce.integer ) {
-    bolt->s.eFlags |= EF_BOUNCE;
-    bolt->nextthink = level.time + 2000;
-  }
 
   return bolt;
 }
