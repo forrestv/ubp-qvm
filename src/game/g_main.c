@@ -648,6 +648,34 @@ void G_MapConfigs( const char *mapname )
   trap_Cvar_Set( "g_mapConfigsLoaded", "1" );
 }
 
+
+void replace_str(char *src, char *find, char *replace, char* dest)
+{
+  int src_pos = 0;
+  int find_len = strlen( find );
+  int dest_pos = 0;
+  while( 1 ) {
+    if( src[src_pos] == '\0' ) {
+      break;
+    } else if( !Q_strncmp( src + src_pos, find, find_len ) ) {
+      int replace_pos = 0;
+      while( 1 ) {
+        if( replace[replace_pos] == '\0' )
+          break;
+        dest[dest_pos] = replace[replace_pos];
+        dest_pos++;
+        replace_pos++;
+      }
+      src_pos += find_len;
+    } else {
+      dest[dest_pos] = src[src_pos];
+      dest_pos++;
+      src_pos++;
+    }
+  }
+  dest[dest_pos] = '\0';
+}
+
 /*
 ============
 G_InitGame
@@ -684,18 +712,23 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
 
   if( g_logFile.string[ 0 ] )
   {
+    qtime_t qt;
+    int t;
+    char logFile[ 1024 ];
+    t = trap_RealTime( &qt );
+
+    replace_str( g_logFile.string, "%s", va( "%04i%02i%02i", qt.tm_year+1900, qt.tm_mon+1, qt.tm_mday ), logFile );
+
     if( g_logFileSync.integer )
-      trap_FS_FOpenFile( g_logFile.string, &level.logFile, FS_APPEND_SYNC );
+      trap_FS_FOpenFile( logFile, &level.logFile, FS_APPEND_SYNC );
     else
-      trap_FS_FOpenFile( g_logFile.string, &level.logFile, FS_APPEND );
+      trap_FS_FOpenFile( logFile, &level.logFile, FS_APPEND );
 
     if( !level.logFile )
       G_Printf( "WARNING: Couldn't open logfile: %s\n", g_logFile.string );
     else
     {
       char serverinfo[ MAX_INFO_STRING ];
-      qtime_t qt;
-      int t;
 
 
       trap_GetServerinfo( serverinfo, sizeof( serverinfo ) );
@@ -703,7 +736,6 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
       G_LogPrintf( "------------------------------------------------------------\n" );
       G_LogPrintf( "InitGame: %s\n", serverinfo );
 
-      t = trap_RealTime( &qt );
       G_LogPrintf("RealTime: %04i/%02i/%02i %02i:%02i:%02i\n",
             qt.tm_year+1900, qt.tm_mon+1, qt.tm_mday, 
             qt.tm_hour, qt.tm_min, qt.tm_sec );
@@ -1151,11 +1183,12 @@ void G_SpawnClients( pTeam_t team )
   spawnQueue_t  *sq = NULL;
   int           numSpawns = 0;
   if( g_doWarmup.integer && ( g_warmupMode.integer==1 || g_warmupMode.integer == 2 ) &&
-      !g_extremeSuddenDeath.integer &&
       level.time - level.startTime < g_warmup.integer * 1000 )
   {
     return;
   }
+  if( g_extremeSuddenDeath.integer )
+    return;
   if( team == PTE_ALIENS )
   {
     sq = &level.alienSpawnQueue;
@@ -1356,9 +1389,12 @@ if( !level.extremeSuddenDeath )
            trap_SendConsoleCommand( EXEC_NOW, "g_alienStage 2\n" );
         if( g_humanStage.integer < 2 )
            trap_SendConsoleCommand( EXEC_NOW, "g_humanStage 2\n" );
-        for( i = 0; i < MAX_CLIENTS; i++ )
+        for( i = 0; i < MAX_CLIENTS; i++ ) {
            level.clients[i].ps.persistant[PERS_CREDIT] = 2000;
-		   
+	   level.clients[i].ps.persistant[ PERS_SCORE ] = 0;
+        }
+        CalculateRanks( );
+ 
         level.extremeSuddenDeathBeginTime = level.time;
 		level.extremeSuddenDeath=qtrue;
         trap_Cvar_Set( "g_extremeSuddenDeath", "1" );   
