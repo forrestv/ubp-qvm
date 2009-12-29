@@ -2207,6 +2207,9 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
       sizeof( level.teamVoteString[ cs_offset ] ),
       "!ban %s \"%s\" team vote kick", level.clients[ clientNum ].pers.ip,
       g_adminTempBan.string );
+    Com_sprintf( level.teamVoteString[ cs_offset ],
+      sizeof( level.teamVoteString[ cs_offset ] ),
+      "!putteam \"%s\" s", name );
     if( reason[0] )
       Q_strcat( level.teamVoteString[ cs_offset ], sizeof( level.teamVoteString[ cs_offset ] ),
         va( ": %s", reason ) );
