@@ -1694,9 +1694,9 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
     return;
 
   if( other ) {
-    int cost = 2;
+    int cost = 1;
     if( other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) cost = cost * 175;
-    if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * 3 / 2 ) return;
+    if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * 5 / 4 ) return;
     if( other->client->ps.persistant[ PERS_CREDIT ] < cost ) {
           trap_SendServerCommand( other-g_entities,
                "print \"Not enough funds\n\"" );
@@ -1705,7 +1705,7 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 
     G_AddCreditToClient( other->client, -(short)cost, qfalse );
 
-    other->health = other->client->ps.stats[ STAT_MAX_HEALTH ] * 3 / 2;
+    other->health = other->client->ps.stats[ STAT_MAX_HEALTH ] * 5 / 4;
   }
 }
 
