@@ -931,9 +931,9 @@ void ClientTimerActions( gentity_t *ent, int msec )
     }
   }
 
-  while( client->time10000 >= 10000 * (g_blobBounce.integer ? .4 : 1. ) )
+  while( client->time10000 >= 10000 * (g_blobBounce.integer ? .25 : 1. ) )
   {
-    client->time10000 -= 10000 * (g_blobBounce.integer ? .4 : 1. );
+    client->time10000 -= 10000 * (g_blobBounce.integer ? .25 : 1. );
 
     if( client->ps.weapon == WP_ALEVEL3_UPG )
     {
@@ -1792,7 +1792,8 @@ void ClientThink_real( gentity_t *ent )
         {
           traceEnt = &g_entities[ entityList[ i ] ];
 
-          if( traceEnt && (traceEnt->biteam == client->ps.stats[ STAT_PTEAM ] || traceEnt->s.modelindex == BA_A_HOVEL ) && traceEnt->use )
+          if( traceEnt && (traceEnt->biteam == client->ps.stats[ STAT_PTEAM ] || traceEnt->s.modelindex == BA_A_HOVEL )
+              && traceEnt->s.modelindex != BA_A_BOOSTER && traceEnt->s.modelindex != BA_H_MEDISTAT && traceEnt->use )
           {
             traceEnt->use( traceEnt, ent, ent ); //other and activator are the same in this context
             break;
