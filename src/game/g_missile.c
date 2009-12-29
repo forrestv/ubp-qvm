@@ -136,6 +136,9 @@ void G_ProcessProximityMine(gentity_t *ent) {
 			return;
 		}
 	}
+        if( level.time > ent->s.time + 2*60*1000 ) {
+            G_ExplodeMissile( ent );
+        }
 }
 
 void AHive_ReturnToHive( gentity_t *self );
