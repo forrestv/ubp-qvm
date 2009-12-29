@@ -1671,8 +1671,8 @@ void ABooster_Touch( gentity_t *self, gentity_t *other, trace_t *trace )
   if( !client )
     return;
 
-  if( client && client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
-    return;
+  //if( client && client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS )
+  //  return;
 
   //only allow boostage once every 30 seconds
   //if( client->lastBoostedTime + BOOSTER_INTERVAL > level.time )
@@ -1695,8 +1695,8 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 
   if( other ) {
     int cost = 2;
-    if( other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) cost = 2000 * 2 / 9;
-    if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * 4 / 3 ) return;
+    if( other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) cost = cost * 175;
+    if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * 3 / 2 ) return;
     if( other->client->ps.persistant[ PERS_CREDIT ] < cost ) {
           trap_SendServerCommand( other-g_entities,
                "print \"Not enough funds\n\"" );
@@ -1705,7 +1705,7 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 
     G_AddCreditToClient( other->client, -(short)cost, qfalse );
 
-    other->health = other->client->ps.stats[ STAT_MAX_HEALTH ] * 4 / 3;
+    other->health = other->client->ps.stats[ STAT_MAX_HEALTH ] * 3 / 2;
   }
 }
 
