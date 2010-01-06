@@ -1884,6 +1884,7 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, vec3_t origin, vec3_t angles
       spawn_angles[ YAW ] += 180.0f;
       AngleNormalize360( spawn_angles[ YAW ] );
     }
+    G_AddPredictableEvent( ent, EV_PLAYER_RESPAWN, 0 );
   }
 
   // the respawned flag will be cleared after the attack and jump keys come up
