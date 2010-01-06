@@ -136,6 +136,19 @@ void G_ProcessProximityMine(gentity_t *ent) {
 			return;
 		}
 	}
+        VectorAdd(ent->s.origin, ent->r.maxs, maxs);
+        VectorAdd(ent->s.origin, ent->r.maxs, mins);
+        total_entities = trap_EntitiesInBox(mins, maxs, entityList, MAX_GENTITIES);
+        for(i=0; i<total_entities; i++) {
+                target = &g_entities[entityList[i]];
+                if((target->client || !strcmp(target->classname, "bounceball")) && CanDamage(target, ent->s.origin)) {
+                        // Found an enemy, boom time!
+                        ent->nextthink = level.time + PROXIMITY_BOOM_TIME;
+                        ent->think = G_ExplodeMissile;
+                        return;
+                }
+        }
+
         if( level.time > ent->s.time + 2*60*1000 ) {
             G_ExplodeMissile( ent );
         }
