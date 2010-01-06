@@ -254,6 +254,7 @@ qboolean G_admin_override( gentity_t *ent, int skiparg );
 qboolean G_admin_switch( gentity_t *ent, int skiparg );
 qboolean G_admin_forcespec( gentity_t *ent, int skiparg );
 qboolean G_admin_forcespawn( gentity_t *ent, int skiparg );
+qboolean G_admin_givefunds( gentity_t *ent, int skiparg );
 qboolean G_admin_unforcespec( gentity_t *ent, int skiparg );
 qboolean G_admin_explode( gentity_t *ent, int skiparg );
 

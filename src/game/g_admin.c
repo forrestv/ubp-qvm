@@ -157,6 +157,10 @@ g_admin_cmd_t g_admin_cmds[ ] =
       "force a player to spawn at the admin's current position",
       "[^3name|slot#^7]"
     },
+    {"givefunds", G_admin_givefunds, "givefunds",
+      "give a player credits or evos",
+      "[^3name|slot#^7] [^3amount^7]"
+    },
 
     {"unforcespec", G_admin_unforcespec, "forcespec",
       "allow a player to join a team besides spectators",
@@ -466,6 +470,39 @@ qboolean G_admin_permission_guid( char *guid, const char* flag )
         perm;
   }
   return qfalse;
+}
+
+int G_admin_get_admin_level( gentity_t *ent ) {
+  int i;
+  if( !ent )
+  {
+    return INT_MAX;
+  }
+  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
+  {
+    if( !Q_stricmp( g_admin_admins[ i ]->guid, ent->client->pers.guid ) )
+    {
+      return g_admin_admins[ i ]->level;
+    }
+  }
+  return 0;
+}
+
+char *G_admin_get_admin_name( gentity_t *ent ) {
+  int i;
+  static char console[] = "console";
+  if( !ent )
+  {
+    return console;
+  }
+  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
+  {
+    if( !Q_stricmp( g_admin_admins[ i ]->guid, ent->client->pers.guid ) )
+    {
+      return g_admin_admins[ i ]->name;
+    }
+  }
+  return 0;
 }
 
 
@@ -1353,6 +1390,8 @@ qboolean G_admin_ban_check( char *userinfo, char *reason, int rlen )
   return qfalse;
 }
 
+char  *ConcatArgs( int start );
+
 qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
 {
   int i;
@@ -1396,7 +1435,93 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
 
     if( G_admin_permission( ent, g_admin_commands[ i ]->flag ) )
     {
-      trap_SendConsoleCommand( EXEC_APPEND, g_admin_commands[ i ]->exec );
+      char newcmd[ 2048 ];
+      char *exec = g_admin_commands[ i ]->exec;
+      int exec_pos = 0;
+      int newcmd_pos = 0;
+      int not_enough_args = 0;
+      int highest_arg = 0;
+      int args = G_SayArgc();
+      while( 1 ) {
+          char c = exec[ exec_pos++ ];
+          if( c == '\0' ) {
+              break;
+          } else if( c == '%' ) {
+              c = exec[ exec_pos++ ];
+              if( c == '-' ) {
+                  int cmd_item;
+                  char *s;
+                  c = exec[ exec_pos++ ];
+                  cmd_item = c - 48;
+                  if( cmd_item < 0 || cmd_item > 9 ) {
+                     newcmd[ newcmd_pos++ ] = '%';
+                     newcmd[ newcmd_pos++ ] = '-';
+                     newcmd[ newcmd_pos++ ] = c;
+                     continue;
+                  }
+                  if( args < skip + cmd_item + 1 ) {
+                      not_enough_args = 1;
+                      break;
+                  }
+                  highest_arg = -1;
+                  
+                  s = G_SayConcatArgs( skip + cmd_item );
+                  
+                  newcmd[ newcmd_pos++ ] = '"';
+                  while( *s ) newcmd[ newcmd_pos++ ] = *s++;
+                  newcmd[ newcmd_pos++ ] = '"';
+              } else if( c == '%' ) {
+                  newcmd[ newcmd_pos++ ] = '%';
+              } else if( c == 'l' ) {
+                  int level = G_admin_get_admin_level( ent );
+                  char level_s[ 16 ];
+                  int level_s_pos = 0;
+                  Com_sprintf( level_s, sizeof( level_s ), "%i", level );
+                  while( level_s[ level_s_pos ] )
+                      newcmd[ newcmd_pos++ ] = level_s[ level_s_pos++ ];
+              } else if( c == 'n' ) {
+                  char *name = G_admin_get_admin_name( ent );
+                  while( *name )
+                      newcmd[ newcmd_pos++ ] = *name++;
+              } else {
+                  int cmd_item;
+                  char s[ 2048 ];
+                  int s_pos = 0;
+                  cmd_item = c - 48;
+                  if( cmd_item < 0 || cmd_item > 9 ) {
+                     newcmd[ newcmd_pos++ ] = '%';
+                     newcmd[ newcmd_pos++ ] = c;
+                     continue;
+                  }
+                  if( args < skip + cmd_item + 1 ) {
+                      not_enough_args = 1;
+                      break;
+                  }
+                  if( cmd_item > highest_arg )
+                      highest_arg = cmd_item;
+                  G_SayArgv( skip + cmd_item, s, sizeof( s ) );
+                  //newcmd[ newcmd_pos++ ] = '"';
+                  while( s[ s_pos ] ) {
+                      if( s[ s_pos ] != ';' )
+                          newcmd[ newcmd_pos++ ] = s[ s_pos ];
+                      s_pos++;
+                  }
+                  //newcmd[ newcmd_pos++ ] = '"';
+              }
+          } else {
+              newcmd[ newcmd_pos++ ] = c;
+          }
+      }
+      newcmd[ newcmd_pos++ ] = '\0';
+      if( not_enough_args ) {
+          ADMP( "^3not enough arguments\n" );
+          return qtrue;
+      }
+      if( highest_arg != -1 && args > skip + highest_arg + 1 ) {
+          ADMP( "^3too many arguments\n" );
+          return qtrue;
+      }
+      trap_SendConsoleCommand( EXEC_APPEND, newcmd );
       admin_log( ent, cmd, skip );
       G_admin_adminlog_log( ent, cmd, NULL, skip, qtrue );
     }
@@ -6751,7 +6876,7 @@ qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
 
   if( G_SayArgc() < minargc )
   {
-    ADMP( "^3!forcespawn: ^7usage: !forcespawn [name|slot#]\n" );
+    ADMP( "^3!forcespawn: ^7usage: !forcespawn [name|slot#] <0-granger 1-human default-auto>\n" );
     return qfalse;
   }
   G_SayArgv( 1 + skiparg, name, sizeof( name ) );
@@ -6780,14 +6905,34 @@ if (vic->client->pers.teamSelection == PTE_NONE )
 player_die(vic, NULL, NULL, 0, MOD_SUICIDE );
 
 
-//        ClientUserinfoChanged( pids[ 0 ], qtrue );
-//              vic->client->sess.sessionTeam = TEAM_FREE;
+        ClientUserinfoChanged( pids[ 0 ], qtrue );
+              vic->client->sess.sessionTeam = TEAM_FREE;
+if( vic->client->pers.teamSelection == PTE_HUMANS ) {
+    vic->client->pers.classSelection = PCL_HUMAN;
+} else if( g_alienStage.integer == 0 ) {
+    vic->client->pers.classSelection = PCL_ALIEN_BUILDER0;
+} else {
+    vic->client->pers.classSelection = PCL_ALIEN_BUILDER0_UPG;
+}
 
-vic->client->pers.classSelection = (vic->client->pers.teamSelection == PTE_HUMANS) ? PCL_HUMAN : PCL_ALIEN_BUILDER0;
+if( G_SayArgc() == minargc + 1) {
+G_SayArgv(2 + skiparg, name, sizeof( name ) );
+if( !strcmp(name, "0") ) {
+if( g_alienStage.integer == 0 ) {
+    vic->client->pers.classSelection = PCL_ALIEN_BUILDER0;
+} else {
+    vic->client->pers.classSelection = PCL_ALIEN_BUILDER0_UPG;
+}
+}
+if( !strcmp(name, "1") ) {
+    vic->client->pers.classSelection = PCL_HUMAN;
+}
+}
 vic->client->pers.humanItemSelection = WP_HBUILD;
 vic->client->pers.evolveHealthFraction = 1.;
 VectorCopy( ent->s.origin, vic->s.pos.trBase );
 ClientSpawn(vic, vic, vic->s.pos.trBase, ent->client ? ent->client->ps.viewangles : ent->s.angles2 ); // ent->s.apos.trBase
+        ClientUserinfoChanged( pids[ 0 ], qtrue );
         return qtrue;
 
 }
@@ -6843,5 +6988,43 @@ qboolean G_admin_explode( gentity_t *ent, int skiparg )
   G_AdminsPrintf( "^3!explode: ^7%s^7 was blown up by ^7%s\n", vic->client->pers.netname, ( ent ) ? ent->client->pers.netname : "console" );
 
   return qtrue;
+}
+
+qboolean G_admin_givefunds( gentity_t *ent, int skiparg )
+{
+  int pids[ MAX_CLIENTS ];
+  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
+  int minargc;
+  gentity_t *vic;
+    char arg[ 64 ];
+
+
+    minargc = 3 + skiparg;
+
+  if( G_SayArgc() < minargc )
+  {
+    ADMP( "^3!givefunds: ^7usage: !givefunds [name|slot#] [amount]\n" );
+    return qfalse;
+  }
+  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
+
+  if( G_ClientNumbersFromString( name, pids ) != 1 )
+  {
+    G_MatchOnePlayer( pids, err, sizeof( err ) );
+    ADMP( va( "^3!givefunds: ^7%s\n", err ) );
+    return qfalse;
+  }
+
+  vic = &g_entities[ pids[ 0 ] ];
+if (vic->client->pers.teamSelection == PTE_NONE )
+ {
+ ADMP( "^3!givefunds: ^7player not on a team\n" );
+
+        return qfalse;
+ }
+    G_SayArgv( 2 + skiparg, arg, sizeof arg );
+
+G_AddCreditToClient( vic->client, atoi( arg ), qfalse );
+return qtrue;
 }
 
