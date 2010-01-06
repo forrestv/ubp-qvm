@@ -717,7 +717,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
     char logFile[ 1024 ];
     t = trap_RealTime( &qt );
 
-    replace_str( g_logFile.string, "%s", va( "%04i%02i%02i", qt.tm_year+1900, qt.tm_mon+1, qt.tm_mday ), logFile );
+    replace_str( g_logFile.string, "%s", va( "%04i-%02i-%02i", qt.tm_year+1900, qt.tm_mon+1, qt.tm_mday ), logFile );
 
     if( g_logFileSync.integer )
       trap_FS_FOpenFile( logFile, &level.logFile, FS_APPEND_SYNC );
