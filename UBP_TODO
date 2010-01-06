@@ -13,8 +13,6 @@
 * make it so rc decon in esd doesn't explode everything
 * vote for general cvars
 * grenade SD
-* reenable black in names
-* decon rc vote
 * vote changing
 * keep eggs/reps disabled in esd
 * player controlled turrets
@@ -34,3 +32,5 @@ DONE
 * bleed damage goes to shooter
 * idle kick if server's full
 * !seen
+* reenable black in names
+* decon rc vote
