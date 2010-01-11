@@ -4740,12 +4740,6 @@ static void Cmd_Ignore_f( gentity_t *ent )
      total-value, type ) );
  }
 
-void Cmd_Getff_f( gentity_t *ent )
-{
-  trap_SendServerCommand( ent - g_entities,
-      va( "print \"Friendly fire is set to %i%% to attacker and %i%% to victim\n\"" , (int)(100.*g_friendlyFireAttackerFrac.value+.5), (int)(100.*g_friendlyFireVictimFrac.value+.5) ) );
-}
-
 void Cmd_Mods_f( gentity_t *ent )
 {
   trap_SendServerCommand( ent - g_entities,
@@ -4821,7 +4815,6 @@ commands_t cmds[ ] = {
   { "protect", CMD_TEAM|CMD_LIVING, Cmd_Protect_f },
   { "resign", CMD_TEAM, Cmd_Resign_f },
   { "builder", 0, Cmd_Builder_f },
-  { "getff", 0, Cmd_Getff_f },
   { "mods", 0, Cmd_Mods_f },
 };
 static int numCmds = sizeof( cmds ) / sizeof( cmds[ 0 ] );
