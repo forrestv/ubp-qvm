@@ -1744,6 +1744,43 @@ void Cmd_CallVote_f( gentity_t *ent )
        if( g_extremeSuddenDeathVoteDelay.integer )
          Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( " in %d seconds", g_extremeSuddenDeathVoteDelay.integer ) );
   }
+  else if( !Q_stricmp( arg1, "epic_sudden_death" ) )
+  {
+      if(!g_epicSuddenDeathVotePercent.integer)
+     {
+       trap_SendServerCommand( ent-g_entities, "print \"Epic Sudden Death votes have been disabled\n\"" );
+       return;
+     }
+          if( !g_suddenDeath.integer )
+         {
+           trap_SendServerCommand( ent-g_entities, "print \"You cannot vote for Epic Sudden Death before Sudden Death\n\"" );
+           return;
+          }
+      if( g_epicSuddenDeath.integer )
+      {
+        trap_SendServerCommand( ent - g_entities,
+          "print \"callvote: the game is already in epic sudden death\n\"" );
+        return;
+      }
+      if( g_extremeSuddenDeath.integer )
+      {
+        trap_SendServerCommand( ent - g_entities,
+          "print \"callvote: the game is already in extreme sudden death\n\"" );
+        return;
+      }
+    else if( level.extremeSuddenDeathWarning == TW_IMMINENT )
+    {
+      trap_SendServerCommand( ent - g_entities,
+        "print \"callvote: it is too close to extreme sudden death\n\"" );
+      return;
+    }
+        level.votePassThreshold = g_epicSuddenDeathVotePercent.integer;
+    Com_sprintf( level.voteString, sizeof( level.voteString ),
+      "g_epicSuddenDeath 1" );
+    Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
+      "Begin epic sudden death" );
+  }
+
   else if( !Q_stricmp( arg1, "map_restart" ) )
   {
     if( g_mapvoteMaxTime.integer 
@@ -1893,6 +1930,7 @@ void Cmd_CallVote_f( gentity_t *ent )
     trap_SendServerCommand( ent-g_entities, "print \"Invalid vote string\n\"" );
     trap_SendServerCommand( ent-g_entities, "print \"Valid vote commands are: "
       "setff, "
+      "epic_sudden_death, "
       "minesblobs, "
       "map, map_restart, draw, nextmap, kick, mute, unmute, poll, extreme_sudden_death, and sudden_death\n" );
     return;
@@ -1900,11 +1938,11 @@ void Cmd_CallVote_f( gentity_t *ent )
   
   if( level.votePassThreshold!=50 )
   {
-    Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( " (Needs > %d percent)", level.votePassThreshold ) );
+    Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( "^7 (Needs > %d percent)", level.votePassThreshold ) );
   }
   
   if ( reason[0]!='\0' )
-    Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( " Reason: '%s^7'", reason ) );
+    Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( "^7 Reason: '%s^7'", reason ) );
   
   G_admin_adminlog_log( ent, "vote", NULL, 0, qtrue );
 
@@ -1913,7 +1951,7 @@ void Cmd_CallVote_f( gentity_t *ent )
   
   G_LogPrintf("Vote: %s^7 called a vote: %s^7\n", ent->client->pers.netname, level.voteDisplayString );
   
-  Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( " Called by: '%s^7'", ent->client->pers.netname ) );
+  Q_strcat( level.voteDisplayString, sizeof( level.voteDisplayString ), va( "^7 Called by: '%s^7'", ent->client->pers.netname ) );
 
   ent->client->pers.voteCount++;
 
@@ -2879,10 +2917,11 @@ void Cmd_Destroy_f( gentity_t *ent )
     traceEnt = &g_entities[ tr.entityNum ];
 
     if( tr.fraction < 1.0f &&
-        ( traceEnt->s.eType == ET_BUILDABLE ) &&
-        ( traceEnt->biteam == ent->client->pers.teamSelection ) &&
-        ( ( ent->client->ps.weapon >= WP_ABUILD ) &&
-          ( ent->client->ps.weapon <= WP_HBUILD ) ) )
+        traceEnt->s.eType == ET_BUILDABLE && (
+          ( traceEnt->biteam == ent->client->pers.teamSelection && ent->client->ps.weapon >= WP_ABUILD && ent->client->ps.weapon <= WP_HBUILD ) ||
+          ( ent->client->pers.teamSelection == PTE_NONE && G_admin_permission( ent, "SPECDECON" ) )
+        )
+      )
     {
       // Cancel deconstruction
       if( g_markDeconstruct.integer && traceEnt->deconstruct )
@@ -2919,7 +2958,7 @@ void Cmd_Destroy_f( gentity_t *ent )
       }
 
       // Disable reactor/om decon, tell player to use vote, and warn team
-      if( traceEnt->s.modelindex == BA_H_REACTOR || traceEnt->s.modelindex == BA_A_OVERMIND ) {
+      if(( traceEnt->s.modelindex == BA_H_REACTOR || traceEnt->s.modelindex == BA_A_OVERMIND) && g_deconVote.integer == 1 ) {
         if( g_floodMinTime.integer && G_Flood_Limited( ent ) )
           trap_SendServerCommand( ent-g_entities,
             "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
@@ -4001,7 +4040,7 @@ void G_StopFollowing( gentity_t *ent )
   if( ent->client->pers.teamSelection == PTE_NONE )
   {
     ent->client->sess.spectatorState = SPECTATOR_FREE;
-    ent->client->ps.pm_type = PM_SPECTATOR;
+    ent->client->ps.pm_type = PM_NOCLIP; //PM_SPECTATOR;
     ent->client->ps.stats[ STAT_HEALTH ] = 100; // hacky server-side fix to prevent cgame from viewlocking a freespec
   }
   else
@@ -4714,7 +4753,7 @@ void Cmd_Mods_f( gentity_t *ent )
   trap_SendServerCommand( ent - g_entities,
       va( "print \"Prox mines: %i Blob bounce: %i\n\"" , g_proximityMines.integer, g_blobBounce.integer ) );
   trap_SendServerCommand( ent - g_entities,
-      va( "print \"Teamvoted RC decon is always enabled\n\"" ) );
+      va( "print \"Teamvote required for RC/OM decon: %i\n\"" , g_deconVote.integer ) );
 }
 
 
@@ -4768,7 +4807,7 @@ commands_t cmds[ ] = {
   { "class", CMD_TEAM, Cmd_Class_f },
 
   { "build", CMD_TEAM|CMD_LIVING, Cmd_Build_f },
-  { "deconstruct", CMD_TEAM|CMD_LIVING, Cmd_Destroy_f },
+  { "deconstruct", 0, Cmd_Destroy_f },
 
   { "buy", CMD_HUMAN|CMD_LIVING, Cmd_Buy_f },
   { "sell", CMD_HUMAN|CMD_LIVING, Cmd_Sell_f },
