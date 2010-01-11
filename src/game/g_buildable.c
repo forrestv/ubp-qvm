@@ -1286,7 +1286,7 @@ Is this hovel entrance blocked?
 
 player is NULL, provideExit is qfalse - check with max bbox
     * used for antispawnblock
-player is not NULL, provideExit is qtrue - check with max bbox ignoring player
+player is not NULL, provideExit is qfalse - check with max bbox ignoring player
     * used for building
 player is not NULL, provideExit is qtrue - check with player's bbox ignoring player and teleport
     * used for hovel usage
