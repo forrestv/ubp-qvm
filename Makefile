@@ -21,11 +21,11 @@ else
   COMPILE_ARCH=$(shell uname -m | sed -e s/i.86/x86/)
 endif
 
-BUILD_CLIENT     =
-BUILD_CLIENT_SMP =
-BUILD_SERVER     =
-BUILD_GAME_SO    =
-BUILD_GAME_QVM   =
+BUILD_CLIENT     = 0
+BUILD_CLIENT_SMP = 0
+BUILD_SERVER     = 1
+BUILD_GAME_SO    = 0
+BUILD_GAME_QVM   = 1
 
 #############################################################################
 #
@@ -720,9 +720,9 @@ endif
 ifneq ($(BUILD_GAME_QVM),0)
   ifneq ($(CROSS_COMPILING),1)
     TARGETS += \
-      $(B)/base/vm/cgame.qvm \
-      $(B)/base/vm/game.qvm \
-      $(B)/base/vm/ui.qvm
+      $(B)/base/vm/game.qvm
+#      $(B)/base/vm/cgame.qvm \
+#      $(B)/base/vm/ui.qvm
   endif
 endif
 
