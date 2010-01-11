@@ -741,6 +741,7 @@ typedef struct
   int               suddenDeathHBuildPoints;
   qboolean          suddenDeath;
   qboolean          extremeSuddenDeath;
+  qboolean          epicSuddenDeath;
   int               suddenDeathBeginTime;
   int               extremeSuddenDeathBeginTime;
   timeWarning_t     suddenDeathWarning;
@@ -1300,8 +1301,6 @@ extern  vmCvar_t  g_motd;
 extern  vmCvar_t  g_warmup;
 extern  vmCvar_t  g_warmupMode;
 extern  vmCvar_t  g_doWarmup;
-extern  vmCvar_t  g_proximityMines;
-extern  vmCvar_t  g_blobBounce;
 extern  vmCvar_t  g_blood;
 extern  vmCvar_t  g_allowVote;
 extern  vmCvar_t  g_requireVoteReasons;
@@ -1413,6 +1412,12 @@ extern  vmCvar_t  g_welcomeMsgTime;
 extern  vmCvar_t  g_freeCredits;
 
 extern  vmCvar_t  g_buildLogMaxLength;
+
+extern  vmCvar_t  g_proximityMines;
+extern  vmCvar_t  g_blobBounce;
+extern  vmCvar_t  g_deconVote;
+extern  vmCvar_t  g_epicSuddenDeath;
+extern  vmCvar_t  g_epicSuddenDeathVotePercent;
 
 void      trap_Printf( const char *fmt );
 void      trap_Error( const char *fmt );

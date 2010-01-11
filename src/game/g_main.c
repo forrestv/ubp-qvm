@@ -80,8 +80,6 @@ vmCvar_t  g_synchronousClients;
 vmCvar_t  g_warmup;
 vmCvar_t  g_warmupMode;
 vmCvar_t  g_doWarmup;
-vmCvar_t  g_proximityMines;
-vmCvar_t  g_blobBounce;
 vmCvar_t  g_restarted;
 vmCvar_t  g_lockTeamsAtStart;
 vmCvar_t  g_logFile;
@@ -206,6 +204,12 @@ vmCvar_t  g_welcomeMsgTime;
 
 vmCvar_t  g_freeCredits;
 
+vmCvar_t  g_proximityMines;
+vmCvar_t  g_blobBounce;
+vmCvar_t  g_deconVote;
+vmCvar_t  g_epicSuddenDeath;
+vmCvar_t  g_epicSuddenDeathVotePercent;
+
 static cvarTable_t   gameCvarTable[ ] =
 {
   // don't override the cheat state set by the system
@@ -257,8 +261,6 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_warmup, "g_warmup", "10", CVAR_ARCHIVE, 0, qtrue  },
   { &g_warmupMode, "g_warmupMode", "1", CVAR_ARCHIVE, 0, qtrue  },
   { &g_doWarmup, "g_doWarmup", "1", CVAR_ARCHIVE, 0, qtrue  },
-  { &g_proximityMines, "g_proximityMines", "0", 0, 0, qtrue  },
-  { &g_blobBounce, "g_blobBounce", "0", 0, 0, qtrue  },
   { &g_logFile, "g_logFile", "games.log", CVAR_ARCHIVE, 0, qfalse  },
   { &g_logFileSync, "g_logFileSync", "0", CVAR_ARCHIVE, 0, qfalse  },
 
@@ -391,8 +393,14 @@ static cvarTable_t   gameCvarTable[ ] =
   
   { &g_rankings, "g_rankings", "0", 0, 0, qfalse },
   { &g_allowShare, "g_allowShare", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse},
-  { &g_creditOverflow, "g_creditOverflow", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse},
+  { &g_creditOverflow, "g_creditOverflow", "1", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse},
   { &g_banNotice, "g_banNotice", "", CVAR_ARCHIVE, 0, qfalse  },
+
+  { &g_proximityMines, "g_proximityMines", "0", 0, 0, qtrue  },
+  { &g_blobBounce, "g_blobBounce", "0", 0, 0, qtrue  },
+  { &g_deconVote, "g_deconVote", "1", 0, 0, qtrue  },
+  { &g_epicSuddenDeath, "g_epicSuddenDeath", "0", 0, 0, qtrue  },
+  { &g_epicSuddenDeathVotePercent, "g_epicSuddenDeathVotePercent", "75", 0, 0, qtrue  },
 };
 
 static int gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[ 0 ] );
@@ -826,6 +834,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
   trap_Cvar_Set( "g_humanKills", 0 );
   trap_Cvar_Set( "g_suddenDeath", 0 );
   trap_Cvar_Set( "g_extremeSuddenDeath", 0 );
+  trap_Cvar_Set( "g_epicSuddenDeath", 0 );
   level.suddenDeathBeginTime = g_suddenDeathTime.integer * 60000;
   level.extremeSuddenDeathBeginTime = g_extremeSuddenDeathTime.integer * 60000;
 
@@ -1275,7 +1284,7 @@ G_TimeTilExtremeSuddenDeath
 */
 int G_TimeTilExtremeSuddenDeath( void )
 {
-  if( (!g_extremeSuddenDeathTime.integer && level.extremeSuddenDeathBeginTime==0 ) || level.extremeSuddenDeathBeginTime<0 )
+  if( (!g_extremeSuddenDeathTime.integer && level.extremeSuddenDeathBeginTime==0 ) || level.extremeSuddenDeathBeginTime<0 || level.epicSuddenDeath)
     return 999999999; // Always some time away
 
   return ( ( level.extremeSuddenDeathBeginTime ) - ( level.time - level.startTime ) );
@@ -1421,7 +1430,29 @@ if( !level.extremeSuddenDeath )
         }
    }
    }
-  
+  if( !level.epicSuddenDeath && g_epicSuddenDeath.integer ) {
+    gentity_t *ent;
+    for( ent = g_entities; ent < &g_entities[ level.num_entities ]; ent++ )
+    {
+      if( !ent->inuse )
+        continue;
+      if( ent->s.eType != ET_BUILDABLE )
+        continue;
+      if( ent->s.modelindex == BA_A_BARRICADE || ent->s.modelindex == BA_A_ACIDTUBE || ent->s.modelindex == BA_A_TRAPPER ||
+          ent->s.modelindex == BA_A_HIVE || ent->s.modelindex == BA_H_MGTURRET || ent->s.modelindex == BA_H_TESLAGEN )
+        G_Damage( ent, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+    }
+        if( g_alienStage.integer < 2 )
+           trap_SendConsoleCommand( EXEC_NOW, "g_alienStage 2\n" );
+        if( g_humanStage.integer < 2 )
+           trap_SendConsoleCommand( EXEC_NOW, "g_humanStage 2\n" );
+    for( i = 0; i < MAX_CLIENTS; i++ ) {
+       level.clients[i].ps.persistant[PERS_CREDIT] = 2000;
+       level.clients[i].ps.persistant[PERS_SCORE] = 0;
+    }
+        CalculateRanks( );
+    level.epicSuddenDeath = qtrue;
+  }
   //set BP at each cycle
   if( g_suddenDeath.integer )
   {
