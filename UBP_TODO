@@ -7,25 +7,19 @@
     * make a way to go backwards
     * more optimal path - TSP
     * skip blocked hovels
-    * fix blockage - more force, faster
 * karma system
 * medi/arm rebuild in esd
 * make it so rc decon in esd doesn't explode everything
 * vote for general cvars
 * grenade SD
 * vote changing
-* keep eggs/reps disabled in esd
+* vote to keep expansion in esd
 * player controlled turrets
 * autospec people initially dead in esd
 * vote to delay sd/esd
-* grenades
+* mines
   * disable in esd
-  * 3 min life
-  * cost up
-* instant-heal on medi/booster for creds - 200/1
 * drop gren on death
-* callteamvote kick removes from team
-* vote to revert rc/om behavior for game
 
 DONE
 * autospec dead in esd
@@ -34,3 +28,8 @@ DONE
 * !seen
 * reenable black in names
 * decon rc vote
+  * vote to revert rc/om behavior for game
+* instant-heal on medi/booster for creds - 200/1
+* callteamvote kick removes from team
+* ^7 in votes
+* free spec when dead OR decon from spec team
