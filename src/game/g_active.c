@@ -396,7 +396,7 @@ void SpectatorThink( gentity_t *ent, usercmd_t *ucmd )
   if( client->sess.spectatorState == SPECTATOR_LOCKED || client->sess.spectatorState == SPECTATOR_FOLLOW )
     client->ps.pm_type = PM_FREEZE;
   else
-    client->ps.pm_type = PM_SPECTATOR;
+    client->ps.pm_type = PM_NOCLIP; // PM_SPECTATOR;
 
   if ( client->sess.spectatorState == SPECTATOR_FOLLOW )
   {
@@ -443,7 +443,7 @@ void SpectatorThink( gentity_t *ent, usercmd_t *ucmd )
     // save results of pmove
     VectorCopy( client->ps.origin, ent->s.origin );
 
-    G_TouchTriggers( ent );
+    //G_TouchTriggers( ent );
     trap_UnlinkEntity( ent );
 
     if( ( attack1 ) && ( client->ps.pm_flags & PMF_QUEUED ) )
@@ -931,9 +931,9 @@ void ClientTimerActions( gentity_t *ent, int msec )
     }
   }
 
-  while( client->time10000 >= 10000 * (g_blobBounce.integer ? .25 : 1. ) )
+  while( client->time10000 >= 10000 * (g_blobBounce.integer ? .5 : 1. ) )
   {
-    client->time10000 -= 10000 * (g_blobBounce.integer ? .25 : 1. );
+    client->time10000 -= 10000 * (g_blobBounce.integer ? .5 : 1. );
 
     if( client->ps.weapon == WP_ALEVEL3_UPG )
     {
