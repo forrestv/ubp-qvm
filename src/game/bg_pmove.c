@@ -28,6 +28,230 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #include "bg_public.h"
 #include "bg_local.h"
 
+typedef struct gentity_s gentity_t;
+
+typedef struct {
+  entityState_t s;        // communicated by server to clients
+
+  qboolean  linked;       // qfalse if not in any good cluster
+  int     linkcount;
+
+  int     svFlags;      // SVF_NOCLIENT, SVF_BROADCAST, etc
+  int     singleClient;   // only send to this client when SVF_SINGLECLIENT is set
+
+  qboolean  bmodel;       // if false, assume an explicit mins / maxs bounding box
+                  // only set by trap_SetBrushModel
+  vec3_t    mins, maxs;
+  int     contents;     // CONTENTS_TRIGGER, CONTENTS_SOLID, CONTENTS_BODY, etc
+                  // a non-solid entity should set to 0
+
+  vec3_t    absmin, absmax;   // derived from mins/maxs and origin + rotation
+
+  // currentOrigin will be used for all collision detection and world linking.
+  // it will not necessarily be the same as the trajectory evaluation for the current
+  // time, because each entity must be moved one at a time after time is advanced
+  // to avoid simultanious collision issues
+  vec3_t    currentOrigin;
+  vec3_t    currentAngles;
+
+  // when a trace call is made and passEntityNum != ENTITYNUM_NONE,
+  // an ent will be excluded from testing if:
+  // ent->s.number == passEntityNum (don't interact with self)
+  // ent->s.ownerNum = passEntityNum  (don't interact with your own missiles)
+  // entity[ent->s.ownerNum].ownerNum = passEntityNum (don't interact with other missiles from owner)
+  int     ownerNum;
+} entityShared_t;
+
+typedef enum
+{
+  MOVER_POS1,
+  MOVER_POS2,
+  MOVER_1TO2,
+  MOVER_2TO1,
+
+  ROTATOR_POS1,
+  ROTATOR_POS2,
+  ROTATOR_1TO2,
+  ROTATOR_2TO1,
+
+  MODEL_POS1,
+  MODEL_POS2,
+  MODEL_1TO2,
+  MODEL_2TO1
+} moverState_t;
+
+
+struct gentity_s
+{
+  entityState_t     s;        // communicated by server to clients
+  entityShared_t    r;        // shared by both the server system and game
+
+  // DO NOT MODIFY ANYTHING ABOVE THIS, THE SERVER
+  // EXPECTS THE FIELDS IN THAT ORDER!
+  //================================
+
+  struct gclient_s  *client;        // NULL if not a client
+
+  qboolean          inuse;
+
+  char              *classname;     // set in QuakeEd
+  int               spawnflags;     // set in QuakeEd
+
+  qboolean          neverFree;      // if true, FreeEntity will only unlink
+                                    // bodyque uses this
+
+  int               flags;          // FL_* variables
+
+  char              *model;
+  char              *model2;
+  int               freetime;       // level.time when the object was freed
+
+  int               eventTime;      // events will be cleared EVENT_VALID_MSEC after set
+  qboolean          freeAfterEvent;
+  qboolean          unlinkAfterEvent;
+
+  qboolean          physicsObject;  // if true, it can be pushed by movers and fall off edges
+                                    // all game items are physicsObjects,
+  float             physicsBounce;  // 1.0 = continuous bounce, 0.0 = no bounce
+  int               clipmask;       // brushes with this content value will be collided against
+                                    // when moving.  items and corpses do not collide against
+                                    // players, for instance
+
+  // movers
+  moverState_t      moverState;
+  int               soundPos1;
+  int               sound1to2;
+  int               sound2to1;
+  int               soundPos2;
+  int               soundLoop;
+  gentity_t         *parent;
+  gentity_t         *nextTrain;
+  gentity_t         *prevTrain;
+  vec3_t            pos1, pos2;
+  float             rotatorAngle;
+  gentity_t         *clipBrush;     // clipping brush for model doors
+
+  char              *message;
+
+  int               timestamp;      // body queue sinking, etc
+
+  float             angle;          // set in editor, -1 = up, -2 = down
+  char              *target;
+  char              *targetname;
+  char              *team;
+  char              *targetShaderName;
+  char              *targetShaderNewName;
+  gentity_t         *target_ent;
+
+  float             speed;
+  float             lastSpeed;      // used by trains that have been restarted
+  vec3_t            movedir;
+
+  // acceleration evaluation
+  qboolean          evaluateAcceleration;
+  vec3_t            oldVelocity;
+  vec3_t            acceleration;
+  vec3_t            oldAccel;
+  vec3_t            jerk;
+
+  int               nextthink;
+  void              (*think)( gentity_t *self );
+  void              (*reached)( gentity_t *self );  // movers call this when hitting endpoint
+  void              (*blocked)( gentity_t *self, gentity_t *other );
+  void              (*touch)( gentity_t *self, gentity_t *other, trace_t *trace );
+  void              (*use)( gentity_t *self, gentity_t *other, gentity_t *activator );
+  void              (*pain)( gentity_t *self, gentity_t *attacker, int damage );
+  void              (*die)( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int damage, int mod );
+
+  int               pain_debounce_time;
+  int               fly_sound_debounce_time;  // wind tunnel
+  int               last_move_time;
+
+  int               health;
+  int               lastHealth; // currently only used for overmind
+
+  qboolean          takedamage;
+
+  int               damage;
+  int               splashDamage; // quad will increase this without increasing radius
+  int               splashRadius;
+  int               methodOfDeath;
+  int               splashMethodOfDeath;
+  int               chargeRepeat;
+
+  int               count;
+
+  gentity_t         *chain;
+  gentity_t         *enemy;
+  gentity_t         *activator;
+  gentity_t         *teamchain;   // next entity in team
+  gentity_t         *teammaster;  // master of the team
+
+  int               watertype;
+  int               waterlevel;
+
+  int               noise_index;
+
+  // timing variables
+  float             wait;
+  float             random;
+
+  pTeam_t           stageTeam;
+  stage_t           stageStage;
+
+  int               biteam;             // buildable item team
+  gentity_t         *parentNode;        // for creep and defence/spawn dependencies
+  qboolean          active;             // for power repeater, but could be useful elsewhere
+  qboolean          powered;            // for human buildables
+  int               builtBy;            // clientNum of person that built this
+  gentity_t         *dccNode;           // controlling dcc
+  gentity_t         *overmindNode;      // controlling overmind
+  qboolean          dcced;              // controlled by a dcc or not?
+  qboolean          spawned;            // whether or not this buildable has finished spawning
+  int               buildTime;          // when this buildable was built
+  int               animTime;           // last animation change
+  int               time1000;           // timer evaluated every second
+  qboolean          deconstruct;        // deconstruct if no BP left
+  int               deconstructTime;    // time at which structure marked
+  int               overmindAttackTimer;
+  int               overmindDyingTimer;
+  int               overmindSpawnsTimer;
+  int               nextPhysicsTime;    // buildables don't need to check what they're sitting on
+                                        // every single frame.. so only do it periodically
+  int               clientSpawnTime;    // the time until this spawn can spawn a client
+  qboolean          lev1Grabbed;        // for turrets interacting with lev1s
+  int               lev1GrabTime;       // for turrets interacting with lev1s
+  int               spawnBlockTime;
+
+  int               credits[ MAX_CLIENTS ];     // human credits for each client
+  qboolean          creditsHash[ MAX_CLIENTS ]; // track who has claimed credit
+  int               killedBy;                   // clientNum of killer
+
+  gentity_t         *targeted;          // true if the player is currently a valid target of a turret
+  vec3_t            turretAim;          // aim vector for turrets
+
+  vec4_t            animation;          // animated map objects
+
+  gentity_t         *builder;           // occupant of this hovel
+
+  qboolean          nonSegModel;        // this entity uses a nonsegmented player model
+
+  buildable_t       bTriggers[ BA_NUM_BUILDABLES ]; // which buildables are triggers
+  pClass_t          cTriggers[ PCL_NUM_CLASSES ];   // which classes are triggers
+  weapon_t          wTriggers[ WP_NUM_WEAPONS ];    // which weapons are triggers
+  upgrade_t         uTriggers[ UP_NUM_UPGRADES ];   // which upgrades are triggers
+
+  int               triggerGravity;                 // gravity for this trigger
+
+  int               suicideTime;                    // when the client will suicide
+
+  int               lastDamageTime;
+  
+  int               bdnumb;     // buildlog entry ID
+};
+
+extern  gentity_t       g_entities[ MAX_GENTITIES ];
+
 pmove_t     *pm;
 pml_t       pml;
 
@@ -48,7 +272,6 @@ float pm_flightfriction = 6.0f;
 float pm_spectatorfriction = 5.0f;
 
 int   c_pmove = 0;
-
 /*
 ===============
 PM_AddEvent
@@ -533,6 +756,8 @@ static qboolean PM_CheckPounce( void )
   pml.walking = qfalse;
 
   pm->ps->pm_flags |= PMF_CHARGE;
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
 
   pm->ps->groundEntityNum = ENTITYNUM_NONE;
 
@@ -603,6 +828,8 @@ static qboolean PM_CheckWallJump( void )
   pml.groundPlane = qfalse;   // jumping away
   pml.walking = qfalse;
   pm->ps->pm_flags |= PMF_JUMP_HELD;
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
 
   pm->ps->groundEntityNum = ENTITYNUM_NONE;
 
@@ -716,6 +943,8 @@ static qboolean PM_CheckJump( void )
   if( pm->ps->stats[ STAT_PTEAM ] == PTE_HUMANS )
     pm->ps->stats[ STAT_STAMINA ] -= 500;
 
+  if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
   pm->ps->groundEntityNum = ENTITYNUM_NONE;
 
   //TA: jump away from wall
@@ -1633,7 +1862,9 @@ static int PM_CorrectAllSolid( trace_t *trace )
     }
   }
 
-  pm->ps->groundEntityNum = ENTITYNUM_NONE;
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
+ pm->ps->groundEntityNum = ENTITYNUM_NONE;
   pml.groundPlane = qfalse;
   pml.walking = qfalse;
 
@@ -1693,6 +1924,8 @@ static void PM_GroundTraceMissed( void )
     if( pm->ps->velocity[ 2 ] < FALLING_THRESHOLD && pml.previous_velocity[ 2 ] >= FALLING_THRESHOLD )
       PM_AddEvent( EV_FALLING );
   }
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
 
   pm->ps->groundEntityNum = ENTITYNUM_NONE;
   pml.groundPlane = qfalse;
@@ -1986,8 +2219,12 @@ static void PM_GroundClimbTrace( void )
     pm->ps->pm_flags &= ~(PMF_TIME_WATERJUMP | PMF_TIME_LAND);
     pm->ps->pm_time = 0;
   }
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
 
   pm->ps->groundEntityNum = trace.entityNum;
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorSubtract( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
 
   // don't reset the z velocity for slopes
 //  pm->ps->velocity[2] = 0;
@@ -2166,6 +2403,8 @@ static void PM_GroundTrace( void )
 
       pm->ps->pm_flags |= PMF_BACKWARDS_JUMP;
     }
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
 
     pm->ps->groundEntityNum = ENTITYNUM_NONE;
     pml.groundPlane = qfalse;
@@ -2181,6 +2420,9 @@ static void PM_GroundTrace( void )
 
     // FIXME: if they can't slide down the slope, let them
     // walk (sharp crevices)
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
+
     pm->ps->groundEntityNum = ENTITYNUM_NONE;
     pml.groundPlane = qtrue;
     pml.walking = qfalse;
@@ -2214,8 +2456,12 @@ static void PM_GroundTrace( void )
       pm->ps->pm_time = 250;
     }
   }
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorAdd( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
 
   pm->ps->groundEntityNum = trace.entityNum;
+ if( pm->ps->groundEntityNum != ENTITYNUM_NONE && g_entities[pm->ps->groundEntityNum].s.pos.trType == TR_LINEAR_STOP )
+    VectorSubtract( pm->ps->velocity, g_entities[pm->ps->groundEntityNum].s.pos.trDelta, pm->ps->velocity);
 
   // don't reset the z velocity for slopes
 //  pm->ps->velocity[2] = 0;
@@ -3237,6 +3483,7 @@ void PM_UpdateViewAngles( playerState_t *ps, const usercmd_t *cmd )
   //actually set the viewangles
   for( i = 0; i < 3; i++ )
     ps->viewangles[ i ] = tempang[ i ];
+
 
   //pull the view into the lock point
   if( ps->pm_type == PM_GRABBED && !BG_InventoryContainsUpgrade( UP_BATTLESUIT, ps->stats ) )
