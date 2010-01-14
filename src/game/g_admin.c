@@ -106,6 +106,10 @@ g_admin_cmd_t g_admin_cmds[ ] =
       "display a CP message to users, optionally specifying team(s) to send to",
       "(-AHS) [^3message^7]"
     },
+    {"cpp", G_admin_cpp, "cpp",
+      "display a CP message to a specific user",
+      "[^3name|slot^7] [^3message^7]"
+    },
 	
 	{"demo", G_admin_demo, "demo",
       "turn admin chat off for the caller so it does not appear in demos. "
@@ -155,7 +159,7 @@ g_admin_cmd_t g_admin_cmds[ ] =
 	
 	{"forcespawn", G_admin_forcespawn, "forcespawn",
       "force a player to spawn at the admin's current position",
-      "[^3name|slot#^7]"
+      "[^3name|slot#^7] <^3class number^7>"
     },
     {"givefunds", G_admin_givefunds, "givefunds",
       "give a player credits or evos",
@@ -1467,9 +1471,13 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                   
                   s = G_SayConcatArgs( skip + cmd_item );
                   
-                  newcmd[ newcmd_pos++ ] = '"';
-                  while( *s ) newcmd[ newcmd_pos++ ] = *s++;
-                  newcmd[ newcmd_pos++ ] = '"';
+                  //newcmd[ newcmd_pos++ ] = '"';
+                  while( *s ) {
+                      if( *s != ';' )
+                          newcmd[ newcmd_pos++ ] = *s;
+                      s++;
+                  }
+                  //newcmd[ newcmd_pos++ ] = '"';
               } else if( c == '%' ) {
                   newcmd[ newcmd_pos++ ] = '%';
               } else if( c == 'l' ) {
@@ -2380,8 +2388,9 @@ qboolean G_admin_ban( gentity_t *ent, int skiparg )
   G_admin_duration( ( seconds ) ? seconds : -1,
     duration, sizeof( duration ) );
 
-  if( ent && !admin_higher_guid( ent->client->pers.guid,
-    g_admin_namelog[ logmatch ]->guid ) )
+  if( ent && ( !admin_higher_guid( ent->client->pers.guid,
+    g_admin_namelog[ logmatch ]->guid ) || ( !Q_strncmp( reason, "vote kick", 9 ) && G_admin_permission( ent, ADMF_IMMUNITY ) ) ) )
+
   {
 
     ADMP( "^3!ban: ^7sorry, but your intended victim has a higher admin"
@@ -3788,6 +3797,34 @@ qboolean G_admin_cp( gentity_t *ent, int skiparg )
 
   s = G_SayConcatArgs( 1 + skiparg );
   G_CP(ent);
+  return qtrue;
+}
+
+qboolean G_admin_cpp( gentity_t *ent, int skiparg )
+{
+  int pids[ MAX_CLIENTS ];
+  char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
+  gentity_t *vic;
+
+  int minargc;
+  char *s;
+  minargc = 3 + skiparg;
+
+  if( G_SayArgc() < minargc )
+  {
+    ADMP( va( "^3!cpp: ^7usage: !cpp [name|slot#] [message]\n" ) );
+    return qfalse;
+  }
+  G_SayArgv( 1 + skiparg, name, sizeof( name ) );
+  if( G_ClientNumbersFromString( name, pids ) != 1 )
+  {
+    G_MatchOnePlayer( pids, err, sizeof( err ) );
+    ADMP( va( "^3!cpp: ^7%s\n", err ) );
+    return qfalse;
+  }
+  vic = &g_entities[ pids[ 0 ] ];
+  s = G_SayConcatArgs( 2 + skiparg );
+  trap_SendServerCommand( vic - g_entities, va( "cp \"%s\n\"", s) );
   return qtrue;
 }
 
@@ -5725,11 +5762,6 @@ qboolean G_admin_slap( gentity_t *ent, int skiparg )
   if( !vic )
   {
     ADMP( "^3!slap: ^7bad target\n" );
-    return qfalse;
-  }
-  if( vic == ent )
-  {
-    ADMP( "^3!slap: ^7sorry, you cannot slap yourself\n" );
     return qfalse;
   }
   if( !admin_higher( ent, vic ) )

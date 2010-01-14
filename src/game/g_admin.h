@@ -246,6 +246,7 @@ qboolean G_admin_designate( gentity_t *ent, int skiparg );
 qboolean G_admin_noclip( gentity_t *ent, int skiparg );
 qboolean G_admin_godmode( gentity_t *ent, int skiparg );
 qboolean G_admin_cp( gentity_t *ent, int skiparg );
+qboolean G_admin_cpp( gentity_t *ent, int skiparg );
 
 qboolean G_admin_slap( gentity_t *ent, int skiparg );
 qboolean G_admin_drop( gentity_t *ent, int skiparg );
