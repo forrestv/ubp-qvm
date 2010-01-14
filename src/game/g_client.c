@@ -92,6 +92,8 @@ void G_OverflowCredits( gclient_t *doner, int credits )
 
   if( !g_creditOverflow.integer )
     return;
+  if( level.epicSuddenDeath )
+    return;
 
   if( doner->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
   {
@@ -178,6 +180,8 @@ G_AddCreditToClient
 void G_AddCreditToClient( gclient_t *client, short credit, qboolean cap )
 {
   if( !client )
+    return;
+  if( level.epicSuddenDeath )
     return;
 
   //if we're already at the max and trying to add credit then stop
@@ -1714,6 +1718,8 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, vec3_t origin, vec3_t angles
         spawnPoint->clientSpawnTime = ALIEN_SPAWN_REPEAT_TIME;
       else if( spawnPoint->biteam == PTE_HUMANS )
         spawnPoint->clientSpawnTime = HUMAN_SPAWN_REPEAT_TIME;
+      if( level.epicSuddenDeath )
+        spawnPoint->clientSpawnTime *= .1;
     }
   }
   client->pers.teamState.state = TEAM_ACTIVE;
@@ -1834,7 +1840,7 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, vec3_t origin, vec3_t angles
   client->ps.stats[ STAT_STAMINA ] = MAX_STAMINA;
 
   //free credits
-  if( g_freeCredits.integer && ent != spawn )
+  if( ( g_freeCredits.integer && ent != spawn ) || level.epicSuddenDeath )
   {
     if( client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
       client->ps.persistant[ PERS_CREDIT ] = ALIEN_MAX_KILLS;
