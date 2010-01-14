@@ -1451,7 +1451,12 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
           if( c == '\0' ) {
               break;
           } else if( c == '%' ) {
+              int optional = 0;
               c = exec[ exec_pos++ ];
+              if( c == 'o' ) {
+                  c = exec[ exec_pos++ ];
+                  optional = 1;
+              }
               if( c == '-' ) {
                   int cmd_item;
                   char *s;
@@ -1464,7 +1469,8 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                      continue;
                   }
                   if( args < skip + cmd_item + 1 ) {
-                      not_enough_args = 1;
+                      if( !optional )
+                          not_enough_args = 1;
                       break;
                   }
                   highest_arg = -1;
@@ -1502,7 +1508,8 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                      continue;
                   }
                   if( args < skip + cmd_item + 1 ) {
-                      not_enough_args = 1;
+                      if( !optional )
+                          not_enough_args = 1;
                       break;
                   }
                   if( cmd_item > highest_arg )
