@@ -4646,7 +4646,7 @@ static void Cmd_Ignore_f( gentity_t *ent )
  
    if( !ent->client ) return;
  
-   if( !g_allowShare.integer )
+   if( !g_allowShare.integer || g_epicSuddenDeath.integer )
    {
      trap_SendServerCommand( ent-g_entities, "print \"Donate has been disabled.\n\"" );
      return;
