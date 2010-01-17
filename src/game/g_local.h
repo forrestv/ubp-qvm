@@ -408,6 +408,8 @@ typedef struct
   int                 lastFloodTime;         // level.time of last flood-limited command
   int                 floodDemerits;         // number of flood demerits accumulated
 
+  int                 vampireSuckFraction;
+
   vec3_t              lastDeathLocation;
   char                guid[ 33 ];
   char                ip[ 16 ];
@@ -591,6 +593,7 @@ typedef struct armourRegion_s
 typedef enum
 {
   TW_NOT = 0,
+  TW_SOON,
   TW_IMMINENT,
   TW_PASSED
 } timeWarning_t;
@@ -747,6 +750,10 @@ typedef struct
   timeWarning_t     suddenDeathWarning;
   timeWarning_t     extremeSuddenDeathWarning;
   timeWarning_t     timelimitWarning;
+
+  int               vampireDeath;
+  int               vampireDeathBeginTime;
+  timeWarning_t     vampireDeathWarning;
 
   spawnQueue_t      alienSpawnQueue;
   spawnQueue_t      humanSpawnQueue;
@@ -1110,6 +1117,7 @@ void CheckTeamVote( int teamnum );
 void LogExit( const char *string );
 int  G_TimeTilSuddenDeath( void );
 int  G_TimeTilExtremeSuddenDeath( void );
+int  G_TimeTilVampireDeath( void );
 void CheckMsgTimer( void );
 qboolean G_Flood_Limited( gentity_t *ent );
 
@@ -1418,6 +1426,9 @@ extern  vmCvar_t  g_blobBounce;
 extern  vmCvar_t  g_deconVote;
 extern  vmCvar_t  g_epicSuddenDeath;
 extern  vmCvar_t  g_epicSuddenDeathVotePercent;
+extern  vmCvar_t  g_vampireDeathTime;
+extern  vmCvar_t  g_vampireDeath;
+extern  vmCvar_t  g_vampireDeathInfo;
 
 void      trap_Printf( const char *fmt );
 void      trap_Error( const char *fmt );

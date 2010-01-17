@@ -3604,6 +3604,13 @@ void Cmd_Build_f( gentity_t *ent )
     }
   }
 
+  if( g_vampireDeath.integer )
+  {
+    trap_SendServerCommand( ent-g_entities,
+      "print \"Building is not allowed during Vampire Sudden Death\n\"" );
+    return;
+  }
+
   team = ent->client->ps.stats[ STAT_PTEAM ];
 
   if( buildable != BA_NONE &&

@@ -1554,6 +1554,35 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
       }
     }
 
+    if( g_vampireDeath.integer && targ->client && attacker->client && targ != attacker )
+    {
+      if( OnSameTeam( targ, attacker ) )
+      {
+        if( mod == MOD_GRENADE )
+          return;
+
+        if( take > attacker->health )
+          take = attacker->health;
+
+        attacker->health -= take;
+        attacker->client->ps.stats[ STAT_HEALTH ] = attacker->health;
+        attacker->lastDamageTime = level.time;
+
+        if( attacker->health <= 0 )
+        {
+          if( attacker->health < -999 )
+            attacker->health = -999;
+          attacker->die( attacker, attacker, attacker, take, MOD_SUICIDE );
+        }
+
+        take = 0 - take;
+      }
+      else
+      {
+        attacker->health += takeNoOverkill;
+        attacker->client->ps.stats[ STAT_HEALTH ] = attacker->health;
+      }
+    }
     
     //Do the damage
     targ->health = targ->health - take;

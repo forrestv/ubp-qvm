@@ -49,6 +49,9 @@ vmCvar_t  g_suddenDeath;
 vmCvar_t  g_extremeSuddenDeathTime;
 vmCvar_t  g_extremeSuddenDeath;
 vmCvar_t  g_suddenDeathMode;
+vmCvar_t  g_vampireDeathTime;
+vmCvar_t  g_vampireDeath;
+vmCvar_t  g_vampireDeathInfo;
 vmCvar_t  g_capturelimit;
 vmCvar_t  g_friendlyFire;
 vmCvar_t  g_friendlyFireAliens;
@@ -238,6 +241,10 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_suddenDeath, "g_suddenDeath", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qtrue },
   { &g_extremeSuddenDeathTime, "g_extremeSuddenDeathTime", "30", CVAR_SERVERINFO | CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
   { &g_extremeSuddenDeath, "g_extremeSuddenDeath", "0", CVAR_SERVERINFO | CVAR_NORESTART, 0, qtrue },
+
+  { &g_vampireDeathTime, "g_vampireDeathTime", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
+  { &g_vampireDeath, "g_vampireDeath", "0", CVAR_NORESTART, 0, qtrue },
+  { &g_vampireDeathInfo, "g_vampireDeathInfo", "( !info vampire )", CVAR_ARCHIVE, 0, qtrue },
 
   { &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },
 
@@ -835,6 +842,7 @@ void G_InitGame( int levelTime, int randomSeed, int restart )
   trap_Cvar_Set( "g_suddenDeath", 0 );
   trap_Cvar_Set( "g_extremeSuddenDeath", 0 );
   trap_Cvar_Set( "g_epicSuddenDeath", 0 );
+  trap_Cvar_Set( "g_vampireDeath", 0 );
   level.suddenDeathBeginTime = g_suddenDeathTime.integer * 60000;
   level.extremeSuddenDeathBeginTime = g_extremeSuddenDeathTime.integer * 60000;
 
@@ -942,6 +950,15 @@ PLAYER COUNTING / SCORE SORTING
 
 ========================================================================
 */
+
+int G_TimeTilVampireDeath( void )
+{
+  if( !g_vampireDeathTime.integer )
+    return 3600000; // Always some time away
+
+  return ( g_vampireDeathTime.integer * 60000 ) -
+         ( level.time - level.startTime );
+}
 
 
 /*
@@ -1373,6 +1390,44 @@ void G_CalculateBuildPoints( void )
        }
     }
   }
+
+   //vampire death
+   if( !g_vampireDeath.integer && level.vampireDeath )
+   {
+     level.vampireDeath = 0;
+     level.vampireDeathWarning = 0;
+   }
+   if( !level.vampireDeath )
+   {
+     if( g_vampireDeath.integer || G_TimeTilVampireDeath( ) <= 0 ) //Conditions to enter VD
+     {
+       if( level.vampireDeathWarning < TW_PASSED )
+       {
+         trap_SendServerCommand( -1, "cp \"^1Vampire Sudden Death!\"" );
+         level.vampireDeath = 1;
+         level.vampireDeathBeginTime = level.time;
+         level.vampireDeathWarning = TW_PASSED;
+         g_vampireDeath.integer = 1;
+       }
+     }
+     else if( G_TimeTilVampireDeath( ) <= 60000 && level.vampireDeathWarning < TW_IMMINENT )
+     {
+         trap_SendServerCommand( -1,
+           va( "cp \"^1Vampire\n^7Sudden Death in 60 seconds!%s%s\"",
+             ( g_vampireDeathInfo.string[ 0 ] ) ? "\n\n" : "",
+             g_vampireDeathInfo.string ) );
+         level.vampireDeathWarning = TW_IMMINENT;
+     }
+     else if( G_TimeTilVampireDeath( ) <= 300000 && level.vampireDeathWarning < TW_SOON )
+     {
+         trap_SendServerCommand( -1,
+           va ("cp \"^1Vampire\n^7Sudden Death in 5 minutes!%s%s\"",
+             ( g_vampireDeathInfo.string[ 0 ] ) ? "\n\n" : "",
+             g_vampireDeathInfo.string ) );
+         level.vampireDeathWarning = TW_SOON;
+     }
+   }
+ 
 
 if( !level.extremeSuddenDeath )
    {
@@ -2846,6 +2901,179 @@ void CheckCvars( void )
 }
 
 /*
+==================
+G_CheckVampireDeathBuildables
+==================
+*/
+static int G_VampireDeathKillBuildable( buildable_t buildable, int count )
+{
+  int i;
+  gentity_t *ent;
+  int n = 0;
+
+  for ( i = 1, ent = g_entities + i; i < level.num_entities; i++, ent++ )
+  {
+    if( ent->s.eType != ET_BUILDABLE )
+      continue;
+
+    if( ent->s.modelindex == buildable && ent->health > 0 )
+    {
+      G_Damage( ent, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+      n++;
+
+      if( count && n >= count )
+        return n;
+    }
+  }
+
+  return n;
+}
+
+static void G_CheckVampireDeathBuildables( void )
+{
+  static int LastAmmoTime = 0;
+  static int LastSuckTime = 0;
+  static int LastDestructTime = 0;
+  int i;
+  gentity_t *ent;
+  qboolean done = qtrue;
+
+  if( !level.vampireDeath )
+    return;
+
+  if( level.intermissionQueued ||
+      level.intermissiontime )
+    return;
+
+  // humans get more ammo every 20 seconds
+  if( level.time - LastAmmoTime >= 20000 )
+  {
+    LastAmmoTime = level.time;
+
+    for( i = 0; i < level.maxclients; i++ )
+    {
+      ent = g_entities + i;
+      if( !ent->inuse || ent->health <= 0 ||
+          ent->client->pers.connected != CON_CONNECTED)
+        continue;
+
+      if( ent->client->pers.teamSelection == PTE_HUMANS )
+      {
+        int ammo, clips, maxClips, maxAmmo;
+
+        BG_FindAmmoForWeapon( ent->client->ps.weapon, &maxAmmo, &maxClips );
+        BG_UnpackAmmoArray( ent->client->ps.weapon, ent->client->ps.ammo,
+                            ent->client->ps.powerups, &ammo, &clips );
+
+        if( maxClips )
+        {
+          if( clips < maxClips )
+            clips++;
+        }
+        else
+        {
+          ammo += maxAmmo / 5;
+          if( ammo > maxAmmo )
+            ammo = maxAmmo;
+        }
+
+        BG_PackAmmoArray( ent->client->ps.weapon, ent->client->ps.ammo,
+                          ent->client->ps.powerups, ammo, clips );
+      }
+    }
+  }
+
+  // health countdown
+  if( level.time - LastSuckTime >= 3000 )
+  {
+    int value;
+    int hp_rate;
+    int damage;
+
+    LastSuckTime = level.time;
+
+    // increase health removal each minute after 1
+    hp_rate = 1 + ( level.time - level.vampireDeathBeginTime ) / 60000;
+    if( hp_rate < 1 ) hp_rate = 1;
+    if( hp_rate > 10) hp_rate = 10;
+
+    for( i = 0; i < level.maxclients; i++ )
+    {
+      ent = g_entities + i;
+      if( !ent->inuse ||
+          ent->health <= 0 ||
+          !ent->client ||
+          ent->client->pers.connected != CON_CONNECTED ||
+          ent->client->sess.sessionTeam == TEAM_SPECTATOR ||
+         ( ent->client->pers.teamSelection != PTE_ALIENS && ent->client->pers.teamSelection != PTE_HUMANS ) )
+        continue;
+
+      value = BG_FindHealthForClass( ent->client->pers.classSelection );
+      if( value < 1 )
+        value = 1;
+      // death from full HP in 60s with damage every 3s, 1000 / 60 * 3 = 50
+      ent->client->pers.vampireSuckFraction += value * 50 * hp_rate;
+
+      damage = ent->client->pers.vampireSuckFraction / 1000;
+      ent->client->pers.vampireSuckFraction -= damage * 1000;
+
+      if ( ent->health > damage )
+        ent->health -= damage;
+      else
+        G_Damage( ent, NULL, NULL, NULL, NULL, damage,
+          DAMAGE_NO_ARMOR|DAMAGE_NO_KNOCKBACK|DAMAGE_NO_PROTECTION|DAMAGE_NO_LOCDAMAGE, MOD_SUICIDE );
+    }
+  }
+
+  // base self destruct
+  if( level.vampireDeath == 2 )
+    return;
+
+  if( level.time - LastDestructTime < 1000 )
+    return;
+
+  LastDestructTime = level.time;
+
+  if( level.numLiveAlienClients == 0 &&
+      level.numLiveHumanClients == 0 )
+  {
+    level.lastWin = PTE_NONE;
+    trap_SendServerCommand( -1, "print \"Timelimit hit\n\"" );
+    trap_SetConfigstring( CS_WINNER, "Stalemate" );
+    LogExit( "Timelimit hit." );
+    G_admin_maplog_result( "t" );
+  }
+
+  if( G_VampireDeathKillBuildable( BA_A_ACIDTUBE, 1 ) ||
+      G_VampireDeathKillBuildable( BA_A_HIVE, 1 ) ||
+      G_VampireDeathKillBuildable( BA_A_TRAPPER, 1 ) ||
+      G_VampireDeathKillBuildable( BA_A_BARRICADE, 1 ) ||
+      G_VampireDeathKillBuildable( BA_A_BOOSTER, 1 ) ||
+      G_VampireDeathKillBuildable( BA_A_SPAWN, 1 ) ||
+      G_VampireDeathKillBuildable( BA_A_OVERMIND, 1 ) )
+  {
+    done = qfalse;
+  }
+
+  if( G_VampireDeathKillBuildable( BA_H_MGTURRET, 1 ) ||
+      G_VampireDeathKillBuildable( BA_H_TESLAGEN, 1 ) ||
+      G_VampireDeathKillBuildable( BA_H_DCC, 1 ) ||
+      G_VampireDeathKillBuildable( BA_H_REPEATER, 1 ) ||
+      G_VampireDeathKillBuildable( BA_H_MEDISTAT, 1 ) ||
+      G_VampireDeathKillBuildable( BA_H_ARMOURY, 1 ) ||
+      G_VampireDeathKillBuildable( BA_H_SPAWN, 1 ) ||
+      G_VampireDeathKillBuildable( BA_H_REACTOR, 1 ) )
+  {
+    done = qfalse;
+  }
+
+  if( done )
+  {
+    level.vampireDeath = 2;
+  }
+}
+
+/*
 =============
 G_RunThink
 
@@ -3032,6 +3260,8 @@ void G_RunFrame( int levelTime )
     if( ent->inuse )
       ClientEndFrame( ent );
   }
+
+  G_CheckVampireDeathBuildables();
 
   // save position information for all active clients 
   G_UnlaggedStore( );

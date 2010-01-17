@@ -765,6 +765,13 @@ void ClientTimerActions( gentity_t *ent, int msec )
     {
       int remainingStartupTime = MEDKIT_STARTUP_TIME - ( level.time - client->lastMedKitTime );
 
+      if( level.vampireDeath )
+      {
+        ent->client->medKitHealthToRestore = 0;
+        trap_SendServerCommand( ent-g_entities,
+          "print \"Medkit is disabled during Vampire Sudden Death\n\"" );
+      }
+
       if( remainingStartupTime < 0 )
       {
         if( ent->health < ent->client->ps.stats[ STAT_MAX_HEALTH ] &&
@@ -826,7 +833,7 @@ void ClientTimerActions( gentity_t *ent, int msec )
 
     //replenish alien health
     if( client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS &&
-      level.surrenderTeam != PTE_ALIENS )
+      level.surrenderTeam != PTE_ALIENS && !level.vampireDeath )
     {
       int       entityList[ MAX_GENTITIES ];
       vec3_t    range = { LEVEL4_REGEN_RANGE, LEVEL4_REGEN_RANGE, LEVEL4_REGEN_RANGE };
