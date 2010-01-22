@@ -1396,6 +1396,22 @@ qboolean G_admin_ban_check( char *userinfo, char *reason, int rlen )
 
 char  *ConcatArgs( int start );
 
+gentity_t *find_ent_by_name( gentity_t *ent, char *name ) {
+  int pids[ MAX_CLIENTS ];
+  char err[ MAX_STRING_CHARS ];
+  gentity_t *vic;
+
+  if( G_ClientNumbersFromString( name, pids ) != 1 )
+  {
+    G_MatchOnePlayer( pids, err, sizeof( err ) );
+    ADMP( va( "^7%s\n", err ) );
+    return NULL;
+  }
+
+  vic = &g_entities[ pids[ 0 ] ];
+  return vic;
+}
+
 qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
 {
   int i;
@@ -1451,11 +1467,15 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
           if( c == '\0' ) {
               break;
           } else if( c == '%' ) {
-              int optional = 0;
+              int optional = 0, find_name = 0;
               c = exec[ exec_pos++ ];
               if( c == 'o' ) {
                   c = exec[ exec_pos++ ];
                   optional = 1;
+              }
+              if( c == 't' ) {
+                  c = exec[ exec_pos++ ];
+                  find_name = 1;
               }
               if( c == '-' ) {
                   int cmd_item;
@@ -1476,6 +1496,12 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                   highest_arg = -1;
                   
                   s = G_SayConcatArgs( skip + cmd_item );
+                  if( find_name ) {
+                      gentity_t *vic = find_ent_by_name( ent, s );
+                      if( !vic ) return qtrue;
+                      if( !vic->client ) return qtrue;
+                      s = vic->client->pers.netname;
+                  }
                   
                   //newcmd[ newcmd_pos++ ] = '"';
                   while( *s ) {
@@ -1515,6 +1541,12 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                   if( cmd_item > highest_arg )
                       highest_arg = cmd_item;
                   G_SayArgv( skip + cmd_item, s, sizeof( s ) );
+                  if( find_name ) {
+                      gentity_t *vic = find_ent_by_name( ent, s );
+                      if( !vic ) return qtrue;
+                      if( !vic->client ) return qtrue;
+                      strcpy( s, vic->client->pers.netname );
+                  }
                   //newcmd[ newcmd_pos++ ] = '"';
                   while( s[ s_pos ] ) {
                       if( s[ s_pos ] != ';' )
