@@ -51,6 +51,7 @@ vmCvar_t  g_extremeSuddenDeath;
 vmCvar_t  g_suddenDeathMode;
 vmCvar_t  g_vampireDeathTime;
 vmCvar_t  g_vampireDeath;
+vmCvar_t  g_vampireDeathVotePercent;
 vmCvar_t  g_vampireDeathInfo;
 vmCvar_t  g_capturelimit;
 vmCvar_t  g_friendlyFire;
@@ -244,6 +245,7 @@ static cvarTable_t   gameCvarTable[ ] =
 
   { &g_vampireDeathTime, "g_vampireDeathTime", "0", CVAR_ARCHIVE | CVAR_NORESTART, 0, qtrue },
   { &g_vampireDeath, "g_vampireDeath", "0", CVAR_NORESTART, 0, qtrue },
+  { &g_vampireDeath, "g_vampireDeathVotePercent", "75", 0, 0, qtrue },
   { &g_vampireDeathInfo, "g_vampireDeathInfo", "( !info vampire )", CVAR_ARCHIVE, 0, qtrue },
 
   { &g_synchronousClients, "g_synchronousClients", "0", CVAR_SYSTEMINFO, 0, qfalse  },

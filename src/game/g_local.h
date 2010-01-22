@@ -1428,6 +1428,7 @@ extern  vmCvar_t  g_epicSuddenDeath;
 extern  vmCvar_t  g_epicSuddenDeathVotePercent;
 extern  vmCvar_t  g_vampireDeathTime;
 extern  vmCvar_t  g_vampireDeath;
+extern  vmCvar_t  g_vampireDeathVotePercent;
 extern  vmCvar_t  g_vampireDeathInfo;
 
 void      trap_Printf( const char *fmt );

@@ -1751,11 +1751,6 @@ void Cmd_CallVote_f( gentity_t *ent )
        trap_SendServerCommand( ent-g_entities, "print \"Epic Sudden Death votes have been disabled\n\"" );
        return;
      }
-          if( !g_suddenDeath.integer )
-         {
-           trap_SendServerCommand( ent-g_entities, "print \"You cannot vote for Epic Sudden Death before Sudden Death\n\"" );
-           return;
-          }
       if( g_epicSuddenDeath.integer )
       {
         trap_SendServerCommand( ent - g_entities,
@@ -1768,7 +1763,7 @@ void Cmd_CallVote_f( gentity_t *ent )
           "print \"callvote: the game is already in extreme sudden death\n\"" );
         return;
       }
-    else if( level.extremeSuddenDeathWarning == TW_IMMINENT )
+    if( level.extremeSuddenDeathWarning == TW_IMMINENT )
     {
       trap_SendServerCommand( ent - g_entities,
         "print \"callvote: it is too close to extreme sudden death\n\"" );
@@ -1779,6 +1774,25 @@ void Cmd_CallVote_f( gentity_t *ent )
       "g_epicSuddenDeath 1" );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
       "Begin epic sudden death" );
+  }
+  else if( !Q_stricmp( arg1, "vampire_sudden_death" ) )
+  {
+      if(!g_vampireDeathVotePercent.integer)
+     {
+       trap_SendServerCommand( ent-g_entities, "print \"Vampire Sudden Death votes have been disabled\n\"" );
+       return;
+     }
+      if( g_vampireDeath.integer )
+      {
+        trap_SendServerCommand( ent - g_entities,
+          "print \"callvote: the game is already in vampire sudden death\n\"" );
+        return;
+      }
+        level.votePassThreshold = g_vampireDeathVotePercent.integer;
+    Com_sprintf( level.voteString, sizeof( level.voteString ),
+      "g_vampireDeath 1" );
+    Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
+      "Begin vampire sudden death" );
   }
 
   else if( !Q_stricmp( arg1, "map_restart" ) )
