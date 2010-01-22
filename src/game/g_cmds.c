@@ -2958,7 +2958,7 @@ void Cmd_Destroy_f( gentity_t *ent )
       }
 
       // Disable reactor/om decon, tell player to use vote, and warn team
-      if(( traceEnt->s.modelindex == BA_H_REACTOR || traceEnt->s.modelindex == BA_A_OVERMIND) && g_deconVote.integer == 1 ) {
+      if(( traceEnt->s.modelindex == BA_H_REACTOR || traceEnt->s.modelindex == BA_A_OVERMIND) && g_deconVote.integer == 1 && !ent->client->pers.designatedBuilder ) {
         if( g_floodMinTime.integer && G_Flood_Limited( ent ) )
           trap_SendServerCommand( ent-g_entities,
             "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
@@ -2984,7 +2984,7 @@ void Cmd_Destroy_f( gentity_t *ent )
               !BG_FindReplaceableTestForBuildable( traceEnt->s.modelindex ) ) ||
             ( g_suddenDeathMode.integer == SDMODE_BP &&
               BG_FindBuildPointsForBuildable( traceEnt->s.modelindex ) ) ||
-            g_suddenDeathMode.integer == SDMODE_NO_BUILD ) )
+            g_suddenDeathMode.integer == SDMODE_NO_BUILD ) && !ent->client->pers.designatedBuilder )
       {
         trap_SendServerCommand( ent-g_entities,
           "print \"During Sudden Death you can only decon buildings that "
