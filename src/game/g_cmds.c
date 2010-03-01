@@ -3805,12 +3805,6 @@ void Cmd_MyStats_f( gentity_t *ent )
    if(!ent) return;
 
 
-   if( !level.intermissiontime && ent->client->pers.statscounters.timeLastViewed && (level.time - ent->client->pers.statscounters.timeLastViewed) <60000 ) 
-   {   
-     ADMP( "You may only check your stats once per minute and during intermission.\n");
-     return;
-   }
-   
    if( !g_myStats.integer )
    {
     ADMP( "myStats has been disabled\n");
