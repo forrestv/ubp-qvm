@@ -1991,6 +1991,8 @@ void ExitLevel( void )
   gclient_t *cl;
   buildHistory_t *tmp, *mark;
 
+  admin_writeconfig();
+
   while( ( tmp = level.buildHistory ) )
   {
     level.buildHistory = level.buildHistory->next;

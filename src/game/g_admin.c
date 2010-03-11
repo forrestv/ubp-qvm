@@ -1522,6 +1522,10 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                   while( level_s[ level_s_pos ] )
                       newcmd[ newcmd_pos++ ] = level_s[ level_s_pos++ ];
               } else if( c == 'n' ) {
+                  char *name = ent->client->pers.netname;
+                  while( *name )
+                      newcmd[ newcmd_pos++ ] = *name++;
+              } else if( c == 'r' ) {
                   char *name = G_admin_get_admin_name( ent );
                   while( *name )
                       newcmd[ newcmd_pos++ ] = *name++;
@@ -5026,6 +5030,8 @@ qboolean G_admin_allready( gentity_t *ent, int skiparg )
     return qfalse;
   }
 
+  admin_writeconfig();
+  
   for( i = 0; i < g_maxclients.integer; i++ )
   {
     cl = level.clients + i;
