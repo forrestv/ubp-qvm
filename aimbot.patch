@@ -1,0 +1,45 @@
+--- src/game/g_active.c	(revision 875)
++++ src/game/g_active.c	(working copy)
+@@ -1393,6 +1393,8 @@
+   int       msec;
+   usercmd_t *ucmd;
+   int       real_pm_type;
++  vec3_t old_fwd, new_fwd;
++  float dot_old_new;
+ 
+   client = ent->client;
+ 
+@@ -1673,8 +1675,33 @@
+   if( !ent->client->noclip )
+     G_TouchTriggers( ent );
+ 
++  AngleVectors( client->ps.viewangles, old_fwd, NULL, NULL );
+   Pmove( &pm );
+ 
++  AngleVectors( client->ps.viewangles, new_fwd, NULL, NULL );
++  dot_old_new = DotProduct( old_fwd, new_fwd );
++  if( dot_old_new < cos( DEG2RAD( 10 ) ) )
++  {
++    vec3_t forward, right, up, muzzle;
++    int i;
++    float max_dot = -1;
++    AngleVectors( client->ps.viewangles, forward, right, up );
++    CalcMuzzlePoint( ent, forward, right, up, muzzle );
++    for( i = 0; i < MAX_CLIENTS; i++ ) {
++       vec3_t pos;
++       float dot;
++    if ( level.clients[ i ].pers.connected == CON_DISCONNECTED ) continue;
++        if( level.clients[ i ].pers.teamSelection != PTE_ALIENS ) continue;
++        VectorSubtract( level.clients[ i ].unlaggedCalc.origin, muzzle, pos );
++        VectorNormalize( pos );
++        dot = DotProduct( pos, new_fwd );
++        if( dot > max_dot ) max_dot = dot;
++    }
++    if( max_dot > cos( DEG2RAD( 1 ) ) ) {
++    G_Say( NULL, NULL, SAY_ADMINS, va( "^1Aimbot detected for player %s^1.", ent->client->pers.netname ) );
++    }
++  }
++
+   G_UnlaggedDetectCollisions( ent );
+ 
+   // save results of pmove
