@@ -4334,7 +4334,7 @@ void Cmd_PTRCRestore_f( gentity_t *ent )
   int                 code;
   connectionRecord_t  *connection;
 
-  if( ent->client->pers.joinedATeam )
+  if( ent->client->pers.joinedATeam && 0 )
   {
     trap_SendServerCommand( ent - g_entities,
       "print \"You cannot use a PTR code after joining a team\n\"" );
