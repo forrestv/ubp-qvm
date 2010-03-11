@@ -1779,7 +1779,7 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
       }
       else if( !Q_stricmp( t, "seen" ) )
       {
-        admin_readconfig_int( &cnf, a->seen );
+        admin_readconfig_int( &cnf, &a->seen );
       }
       else
       {
