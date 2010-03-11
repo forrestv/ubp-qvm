@@ -669,7 +669,7 @@ static void admin_writeconfig_int( int v, fileHandle_t f )
   trap_FS_Write( "\n", 1, f );
 }
 
-static void admin_writeconfig( void )
+void admin_writeconfig( void )
 {
   fileHandle_t f;
   int len, i;
@@ -716,6 +716,8 @@ static void admin_writeconfig( void )
     admin_writeconfig_int( g_admin_admins[ i ]->level, f );
     trap_FS_Write( "flags   = ", 10, f );
     admin_writeconfig_string( g_admin_admins[ i ]->flags, f );
+    trap_FS_Write( "seen    = ", 10, f );
+    admin_writeconfig_int( g_admin_admins[ i ]->seen, f );
     trap_FS_Write( "\n", 1, f );
   }
   for( i = 0; i < MAX_ADMIN_BANS && g_admin_bans[ i ]; i++ )
@@ -1774,6 +1776,10 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
       else if( !Q_stricmp( t, "flags" ) )
       {
         admin_readconfig_string( &cnf, a->flags, sizeof( a->flags ) );
+      }
+      else if( !Q_stricmp( t, "seen" ) )
+      {
+        admin_readconfig_int( &cnf, a->seen );
       }
       else
       {
@@ -2847,7 +2853,7 @@ qboolean G_admin_seen(gentity_t *ent, int skiparg )
     ADMBP( va( "^3!seen:^7 found %d player%s matching '%s'\n",
       count, (count == 1) ? "" : "s", search ) );
   else if ( !count )
-    ADMBP( "^3!seen:^7 no one connectd by that slot number\n" );
+    ADMBP( "^3!seen:^7 no one connected by that slot number\n" );
 
   ADMBP_end();
   return qtrue;
@@ -6960,7 +6966,7 @@ qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
   }
 
   vic = &g_entities[ pids[ 0 ] ];
-if (vic->client->pers.teamSelection == PTE_NONE )
+if (vic->client->pers.teamSelection == PTE_NONE && 0)
  {
  ADMP( "^3!forcespawn: ^7player not on a team\n" );
 
@@ -6973,7 +6979,7 @@ if (vic->client->pers.teamSelection == PTE_NONE )
         return qfalse;
  }
 
-player_die(vic, NULL, NULL, 0, MOD_SUICIDE );
+//player_die(vic, NULL, NULL, 0, MOD_SUICIDE );
 
 
         ClientUserinfoChanged( pids[ 0 ], qtrue );

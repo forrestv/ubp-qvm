@@ -2329,6 +2329,8 @@ void LogExit( const char *string )
   }
 
   G_SendGameStat( level.lastWin );
+  
+  admin_writeconfig();
 }
 
 
