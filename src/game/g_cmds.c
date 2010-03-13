@@ -1936,7 +1936,7 @@ void Cmd_CallVote_f( gentity_t *ent )
       Com_sprintf( level.voteString, sizeof( level.voteString ), "g_proximityMines 1;g_blobBounce 1" );
       Com_sprintf( level.voteDisplayString,
           sizeof( level.voteDisplayString ), "Enable proximity mines and bouncing blobs");
-    level.votePassThreshold = 75;
+    level.votePassThreshold = 66;
     }
    }
   else
