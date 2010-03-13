@@ -290,7 +290,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
     if( attacker == self || OnSameTeam( self, attacker ) )
     {
-      AddScore( attacker, -1 );
+      if( attacker != self )
+        AddScore( attacker, -1 );
 
       // Normal teamkill penalty
       if( !g_retribution.integer )
@@ -330,8 +331,8 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
       }
     }
   }
-  else if( attacker->s.eType != ET_BUILDABLE )
-    AddScore( self, -1 );
+  //else if( attacker->s.eType != ET_BUILDABLE )
+  //  AddScore( self, -1 );
 
   //total up all the damage done by every client
   for( i = 0; i < MAX_CLIENTS; i++ )
@@ -480,6 +481,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
         level.alienStatsCounters.feeds++;
       }
     }
+    AddScore( self, -1 );
   }
 
   if( totalDamage > 0.0f )
