@@ -3279,8 +3279,8 @@ static itemBuildError_t G_SufficientBPAvailable( buildable_t     buildable,
     return IBE_NOROOM;
 
   // There are one or more repeaters we can't remove
-  if( repeaterInRangeCount > 0 )
-    return IBE_RPTWARN2;
+  // if( repeaterInRangeCount > 0 )
+  //  return IBE_RPTWARN2;
 
   // Sort the list
   cmpBuildable = buildable;
@@ -3485,7 +3485,7 @@ itemBuildError_t G_CanBuild( gentity_t *ent, buildable_t buildable, int distance
       reason = IBE_NODCC;
 
     //check that there is a parent reactor when building a repeater
-    if( buildable == BA_H_REPEATER )
+    if( buildable == BA_H_REPEATER && 0 )
     {
       for ( i = 1, tempent = g_entities + i; i < level.num_entities; i++, tempent++ )
       {
