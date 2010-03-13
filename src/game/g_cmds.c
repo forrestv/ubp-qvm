@@ -2261,7 +2261,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
       g_adminTempBan.string );
     Com_sprintf( level.teamVoteString[ cs_offset ],
       sizeof( level.teamVoteString[ cs_offset ] ),
-      "!putteam \"%s\" s", name );
+      "!forcespec \"%s\"", name );
     if( reason[0] )
       Q_strcat( level.teamVoteString[ cs_offset ], sizeof( level.teamVoteString[ cs_offset ] ),
         va( ": %s", reason ) );
