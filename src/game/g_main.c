@@ -409,7 +409,7 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_blobBounce, "g_blobBounce", "0", 0, 0, qtrue  },
   { &g_deconVote, "g_deconVote", "1", 0, 0, qtrue  },
   { &g_epicSuddenDeath, "g_epicSuddenDeath", "0", 0, 0, qtrue  },
-  { &g_epicSuddenDeathVotePercent, "g_epicSuddenDeathVotePercent", "75", 0, 0, qtrue  },
+  { &g_epicSuddenDeathVotePercent, "g_epicSuddenDeathVotePercent", "74", 0, 0, qtrue  },
 };
 
 static int gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[ 0 ] );
@@ -1496,7 +1496,7 @@ if( !level.extremeSuddenDeath )
       if( ent->s.eType != ET_BUILDABLE )
         continue;
       if( ent->s.modelindex == BA_A_BARRICADE || ent->s.modelindex == BA_A_ACIDTUBE || ent->s.modelindex == BA_A_TRAPPER ||
-          ent->s.modelindex == BA_A_HIVE || ent->s.modelindex == BA_H_MGTURRET || ent->s.modelindex == BA_H_TESLAGEN )
+          ent->s.modelindex == BA_A_HIVE || ent->s.modelindex == BA_H_MGTURRET || ent->s.modelindex == BA_H_TESLAGEN || ent->s.modelindex == BA_A_BOOSTER )
         G_Damage( ent, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
     }
         if( g_alienStage.integer < 2 )
