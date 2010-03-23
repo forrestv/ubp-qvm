@@ -512,7 +512,7 @@ Returns qfalse if the client is dropped
 */
 qboolean ClientInactivityTimer( gclient_t *client )
 {
-  if( ! g_inactivity.integer || G_admin_permission( &g_entities[ client->ps.clientNum ], ADMF_IMMUNITY ) )
+  if( ! g_inactivity.integer || G_admin_permission( &g_entities[ client->ps.clientNum ], ADMF_IMMUNITY ) || client->ps.clientNum < g_privateClients.integer )
   {
     // give everyone some time, so if the operator sets g_inactivity during
     // gameplay, everyone isn't kicked
@@ -1785,7 +1785,8 @@ void ClientThink_real( gentity_t *ent )
 
       traceEnt = &g_entities[ trace.entityNum ];
 
-      if( traceEnt && (traceEnt->biteam == client->ps.stats[ STAT_PTEAM ] || traceEnt->s.modelindex == BA_A_HOVEL ) && traceEnt->use )
+      if( traceEnt && (traceEnt->biteam == client->ps.stats[ STAT_PTEAM ] || traceEnt->s.modelindex == BA_A_HOVEL || traceEnt->s.modelindex == BA_A_BOOSTER
+          || traceEnt->s.modelindex == BA_H_MEDISTAT ) && traceEnt->use )
         traceEnt->use( traceEnt, ent, ent ); //other and activator are the same in this context
       else
       {
