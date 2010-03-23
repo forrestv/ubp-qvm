@@ -4763,6 +4763,8 @@ void Cmd_Mods_f( gentity_t *ent )
       va( "print \"Prox mines: %i Blob bounce: %i\n\"" , g_proximityMines.integer, g_blobBounce.integer ) );
   trap_SendServerCommand( ent - g_entities,
       va( "print \"Teamvote required for RC/OM decon: %i\n\"" , g_deconVote.integer ) );
+  trap_SendServerCommand( ent - g_entities,
+      va( "print \"QVM Version: 0\n\"" , g_deconVote.integer ) );
 }
 
 
