@@ -2788,8 +2788,8 @@ void Cmd_Class_f( gentity_t *ent )
 
           if( ent->client->pers.evolveHealthFraction < 0.0f )
             ent->client->pers.evolveHealthFraction = 0.0f;
-          else if( ent->client->pers.evolveHealthFraction > 1.0f )
-            ent->client->pers.evolveHealthFraction = 1.0f;
+          //else if( ent->client->pers.evolveHealthFraction > 1.0f )
+          //  ent->client->pers.evolveHealthFraction = 1.0f;
 
           //remove credit
           G_AddCreditToClient( ent->client, -(short)numLevels, qtrue );
