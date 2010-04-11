@@ -108,7 +108,7 @@ g_admin_cmd_t g_admin_cmds[ ] =
 					 "[^3name|slot#|admin#|*adminlevel^7] (^5+^7|^5-^7)[^3flag^7]"
 			 },
 
-			 {"flaglist", G_admin_flaglist, "flag",
+			 {"flaglist", G_admin_flaglist, "specme",
 					 "list all flags understood by this server",
 					 ""
 			 },
