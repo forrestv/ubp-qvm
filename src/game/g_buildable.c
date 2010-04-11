@@ -1706,7 +1706,7 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
     G_AddCreditToClient( other->client, -(short)cost, qfalse );
 
     other->health = other->client->ps.stats[ STAT_MAX_HEALTH ] * (g_epicSuddenDeath.integer ? 8 : 5) / 4;
-    ent->client->ps.stats[ STAT_STAMINA ] = MAX_STAMINA;
+    other->client->ps.stats[ STAT_STAMINA ] = MAX_STAMINA;
   }
 }
 
