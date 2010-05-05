@@ -2106,7 +2106,8 @@ qboolean G_admin_setlevel( gentity_t *ent, int skiparg )
   qboolean updated = qfalse;
   g_admin_admin_t *a;
   qboolean found = qfalse;
-  int id = -1;
+  int id = -1, tmp;
+  qboolean allowed = qtrue;
 
   if( G_SayArgc() < 3 + skiparg )
   {
@@ -2116,6 +2117,19 @@ qboolean G_admin_setlevel( gentity_t *ent, int skiparg )
   G_SayArgv( 1 + skiparg, testname, sizeof( testname ) );
   G_SayArgv( 2 + skiparg, lstr, sizeof( lstr ) );
   l = atoi( lstr );
+
+if( G_SayArgc() > 3 + skiparg ) {
+  allowed = qfalse;
+  for(i = 0; i < G_SayArgc() - (3 + skiparg); i++) {
+    G_SayArgv( 3 + skiparg + i, lstr, sizeof( lstr ) );
+    tmp = atoi( lstr );
+    if(tmp == ent->client->pers.adminLevel) allowed = qtrue;
+  }
+}
+  if( ent && !allowed ) {
+    ADMP( "^3!setlevel: ^7can't set someone of that current level\n" );
+    return qfalse;
+  }
 
   if( ent && l > ent->client->pers.adminLevel )
   {
