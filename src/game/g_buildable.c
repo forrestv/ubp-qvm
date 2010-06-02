@@ -1695,6 +1695,7 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 
   if( other ) {
     int cost = 1;
+    if(self->s.modelindex == BA_H_MEDISTAT && other->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS) return;
     if( other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) cost = cost * 175;
     if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * (g_epicSuddenDeath.integer ? 8 : 5) / 4 ) return;
     if( other->client->ps.persistant[ PERS_CREDIT ] < cost ) {
@@ -2174,7 +2175,7 @@ void HMedistat_Think( gentity_t *self )
     if( player->flags & FL_NOTARGET )
       continue; // notarget cancels even beneficial effects?
 
-        if( player->client && ( player->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS || player->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS ) )
+        if( player->client && ( player->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS || (0 && player->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS ) ) )
         {
           if( player->health < player->client->ps.stats[ STAT_MAX_HEALTH ] &&
               player->client->ps.pm_type != PM_DEAD )

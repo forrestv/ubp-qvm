@@ -1087,7 +1087,7 @@ static gentity_t *G_FindNewZapTarget( gentity_t *ent )
   gentity_t *enemy;
   trace_t   tr;
 
-  VectorScale( range, 1.0f / M_ROOT3, range );
+  //VectorScale( range, 1.0f / M_ROOT3, range );
   VectorAdd( ent->s.origin, range, maxs );
   VectorSubtract( ent->s.origin, range, mins );
 
@@ -1102,6 +1102,8 @@ static gentity_t *G_FindNewZapTarget( gentity_t *ent )
           BG_FindTeamForBuildable( enemy->s.modelindex ) == BIT_HUMANS ) ) && enemy->health > 0 )
     {
       qboolean foundOldTarget = qfalse;
+
+      if( Distance( ent->s.origin, enemy->s.origin ) > LEVEL2_AREAZAP_RANGE ) continue;
 
       trap_Trace( &tr, muzzle, NULL, NULL, enemy->s.origin, ent->s.number, MASK_SHOT );
 

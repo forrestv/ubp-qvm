@@ -608,7 +608,7 @@ void G_LeaveTeam( gentity_t *self )
     G_RemoveFromSpawnQueue( &level.humanSpawnQueue, self->client->ps.clientNum );
   else
   {
-    if( self->client->sess.spectatorState == SPECTATOR_FOLLOW )
+    if( self->client->sess.spectatorState == SPECTATOR_FOLLOW && 0)
     {
       G_StopFollowing( self );
     }
@@ -2729,6 +2729,7 @@ void Cmd_Class_f( gentity_t *ent )
       VectorAdd( ent->client->ps.origin, range, maxs );
       VectorSubtract( ent->client->ps.origin, range, mins );
 
+      /*
       num = trap_EntitiesInBox( mins, maxs, entityList, MAX_GENTITIES );
       for( i = 0; i < num; i++ )
       {
@@ -2742,6 +2743,7 @@ void Cmd_Class_f( gentity_t *ent )
           return;
         }
       }
+      */
 
       if( !level.overmindPresent  &&
         !ent->client->pers.override)
@@ -4232,7 +4234,7 @@ void Cmd_Follow_f( gentity_t *ent )
     }
 
     // can't follow another spectator
-    if( level.clients[ i ].pers.teamSelection == PTE_NONE)
+    if( level.clients[ i ].pers.teamSelection == PTE_NONE && 0 )
     {
       trap_SendServerCommand( ent - g_entities, "print \"follow: You cannot follow another spectator.\n\"" );
       return;
@@ -4764,7 +4766,7 @@ void Cmd_Mods_f( gentity_t *ent )
   trap_SendServerCommand( ent - g_entities,
       va( "print \"Teamvote required for RC/OM decon: %i\n\"" , g_deconVote.integer ) );
   trap_SendServerCommand( ent - g_entities,
-      va( "print \"QVM Version: 0\n\"" , g_deconVote.integer ) );
+      va( "print \"QVM Version: 4\n\"" , g_deconVote.integer ) );
 }
 
 

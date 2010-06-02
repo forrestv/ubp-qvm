@@ -1625,6 +1625,19 @@ void ClientBegin( int clientNum )
 
   // count current clients and rank for scoreboard
   CalculateRanks( );
+  
+  
+  G_admin_recompute_votes_guid( ent->client->pers.guid );
+
+
+  if( g_extremeSuddenDeath.value )
+    trap_SendServerCommand( client->ps.clientNum, va( "print \"^7Game is in Sudden Death\n\"" ) );
+  if( g_extremeSuddenDeath.value )
+    trap_SendServerCommand( client->ps.clientNum, va( "print \"^1Game is in Extreme Sudden Death\n\"" ) );
+  if( g_epicSuddenDeath.value )
+    trap_SendServerCommand( client->ps.clientNum, va( "print \"^2Game is in Epic Sudden Death\n\"" ) );
+  if( g_vampireDeath.value )
+    trap_SendServerCommand( client->ps.clientNum, va( "print \"^6Game is in Vampire Sudden Death\n\"" ) );
 }
 
 /*

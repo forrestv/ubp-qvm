@@ -3467,7 +3467,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qfalse,               //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3492,7 +3492,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qfalse,               //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3517,7 +3517,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qtrue,                //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3542,7 +3542,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qfalse,               //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3567,7 +3567,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qfalse,               //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3592,7 +3592,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qfalse,               //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3617,7 +3617,7 @@ weaponAttributes_t bg_weapons[ ] =
     qtrue,                //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qtrue,                //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3642,7 +3642,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qfalse,               //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3667,7 +3667,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qfalse,               //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;
@@ -3692,7 +3692,7 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
-    qfalse,               //qboolean  purchasable;
+    qtrue,               //qboolean  purchasable;
     qfalse,               //qboolean  longRanged;
     0,                    //int       buildDelay;
     WUT_ALIENS            //WUTeam_t  team;

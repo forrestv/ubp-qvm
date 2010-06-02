@@ -92,6 +92,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define MAX_ADMIN_SHOWBANS 10
 #define MAX_ADMIN_MAPLOG_LENGTH 5
 
+struct g_admin_guid_chain_s
+{
+  char guid[ 33 ];
+  struct g_admin_guid_chain_s *next;
+};
+
+typedef struct g_admin_guid_chain_s g_admin_guid_chain;
+
 // important note: QVM does not seem to allow a single char to be a
 // member of a struct at init time.  flag has been converted to char*
 typedef struct
@@ -119,6 +127,8 @@ typedef struct g_admin_admin
   int level;
   char flags[ MAX_ADMIN_FLAGS ];
   int seen;
+  g_admin_guid_chain *app_yes;
+  g_admin_guid_chain *app_no;
 }
 g_admin_admin_t;
 
@@ -271,5 +281,10 @@ void G_admin_cleanup( void );
 void G_admin_namelog_cleanup( void );
 
 void admin_writeconfig( void );
+
+qboolean G_admin_applist( gentity_t *ent, int skiparg );
+qboolean G_admin_appvote( gentity_t *ent, int skiparg );
+
+void G_admin_recompute_votes_guid( char *guid);
 
 #endif /* ifndef _G_ADMIN_H */

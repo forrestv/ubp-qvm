@@ -77,6 +77,16 @@ g_admin_cmd_t g_admin_cmds[ ] =
       "(^5name|slot^7)"
     },
 
+    {"applist", G_admin_applist, "specme",
+      "list applications sorted by last activity time",
+      "(^5page number^7)"
+    },
+    {"appvote", G_admin_appvote, "appvoter",
+      "set your vote on an applicant. "
+      "x means no opinion.",
+      "[^3no/x/yes^7] (^5app# default=you^7) (^5more app#s ...^7)"
+    },
+
     {"ban", G_admin_ban, "ban",
       "ban a player by IP and GUID with an optional expiration time and reason."
       "  time is specified as numbers followed by units 'w' (weeks), 'd' "
@@ -170,7 +180,7 @@ g_admin_cmd_t g_admin_cmds[ ] =
 	
 	{"forcespawn", G_admin_forcespawn, "forcespawn",
       "force a player to spawn at the admin's current position",
-      "[^3name|slot#^7] <^3class number^7>"
+      "[^3name|slot#^7] (^5class^7)"
     },
     {"givefunds", G_admin_givefunds, "givefunds",
       "give a player credits or evos",
@@ -201,16 +211,6 @@ g_admin_cmd_t g_admin_cmds[ ] =
     {"kick", G_admin_kick, "kick",
       "kick a player with an optional reason",
       "[^3name|slot#^7] (^5reason^7)"
-    },
-    
-    {"L0", G_admin_L0, "l0",
-      "Sets a level 1 to level 0",
-      "[^3name|slot#^7]"
-    },
-    
-    {"L1", G_admin_L1, "l1",
-      "Sets a level 0 to level 1",
-      "[^3name|slot#^7]"
     },
     
     {"layoutsave", G_admin_layoutsave, "layoutsave",
@@ -462,25 +462,16 @@ g_admin_adminlog_t *g_admin_adminlog[ MAX_ADMIN_ADMINLOGS ];
 static int admin_tklog_index = 0;
 g_admin_tklog_t *g_admin_tklog[ MAX_ADMIN_TKLOGS ];
 
-// This function should only be used directly when the client is connecting and thus has no GUID.
-// Else, use G_admin_permission() 
-qboolean G_admin_permission_guid( char *guid, const char* flag )
+qboolean G_admin_permission_admin( g_admin_admin_t *admin, const char* flag )
 {
   int i;
   int l = 0;
   qboolean perm = qfalse;
 
-  // Does the admin specifically have this flag granted/denied to them, 
-  // irrespective of their admin level?
-  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
-  {
-    if( !Q_stricmp( guid, g_admin_admins[ i ]->guid ) )
-    {
-      if( admin_permission( g_admin_admins[ i ]->flags, flag, &perm ) )
-        return perm;
-      l = g_admin_admins[ i ]->level;
-      break;
-    }
+  if( admin ) {
+    if( admin_permission( admin->flags, flag, &perm ) )
+      return perm;
+    l = admin->level;
   }
 
   // If not, is this flag granted/denied for their admin level?
@@ -490,7 +481,25 @@ qboolean G_admin_permission_guid( char *guid, const char* flag )
       return admin_permission( g_admin_levels[ i ]->flags, flag, &perm ) &&
         perm;
   }
+  
   return qfalse;
+}
+
+// This function should only be used directly when the client is connecting and thus has no GUID.
+// Else, use G_admin_permission() 
+qboolean G_admin_permission_guid( char *guid, const char* flag )
+{
+  int i;
+
+  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
+  {
+    if( !Q_stricmp( guid, g_admin_admins[ i ]->guid ) )
+    {
+      return G_admin_permission_admin( g_admin_admins[ i ], flag );
+    }
+  }
+
+  return G_admin_permission_admin( NULL, flag );
 }
 
 int G_admin_get_admin_level( gentity_t *ent ) {
@@ -526,6 +535,17 @@ char *G_admin_get_admin_name( gentity_t *ent ) {
   return 0;
 }
 
+int G_admin_get_admin_index( gentity_t *ent ) {
+  int i;
+  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
+  {
+    if( !Q_stricmp( g_admin_admins[ i ]->guid, ent->client->pers.guid ) )
+    {
+      return i;
+    }
+  }
+  return -1;
+}
 
 qboolean G_admin_permission( gentity_t *ent, const char *flag )
 {
@@ -720,6 +740,7 @@ void admin_writeconfig( void )
   }
   for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
   {
+    g_admin_guid_chain *cur;
     // don't write level 0 users
     if( g_admin_admins[ i ]->level < 1 )
       continue;
@@ -735,6 +756,20 @@ void admin_writeconfig( void )
     admin_writeconfig_string( g_admin_admins[ i ]->flags, f );
     trap_FS_Write( "seen    = ", 10, f );
     admin_writeconfig_int( g_admin_admins[ i ]->seen, f );
+    
+    cur = g_admin_admins[ i ]->app_yes;
+    while( cur ) {
+      trap_FS_Write( "app_yes = ", 10, f );
+      admin_writeconfig_string( cur->guid, f );
+      cur = cur->next;
+    }
+    cur = g_admin_admins[ i ]->app_no;
+    while( cur ) {
+      trap_FS_Write( "app_no  = ", 10, f );
+      admin_writeconfig_string( cur->guid, f );
+      cur = cur->next;
+    }
+    
     trap_FS_Write( "\n", 1, f );
   }
   for( i = 0; i < MAX_ADMIN_BANS && g_admin_bans[ i ]; i++ )
@@ -1802,6 +1837,24 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
       {
         admin_readconfig_int( &cnf, &a->seen );
       }
+      else if( !Q_stricmp( t, "app_yes" ) )
+      {
+        g_admin_guid_chain *new = G_Alloc( sizeof( g_admin_guid_chain ) );
+        
+        admin_readconfig_string( &cnf, new->guid, sizeof( new->guid ) );
+        new->next = a->app_yes;
+        
+        a->app_yes = new;
+      }
+      else if( !Q_stricmp( t, "app_no" ) )
+      {
+        g_admin_guid_chain *new = G_Alloc( sizeof( g_admin_guid_chain ) );
+        
+        admin_readconfig_string( &cnf, new->guid, sizeof( new->guid ) );
+        new->next = a->app_no;
+        
+        a->app_no = new;
+      }
       else
       {
         ADMP( va( "^3!readconfig: ^7[admin] parse error near %s on line %d\n",
@@ -1893,6 +1946,8 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
       a->level = 0;
       *a->flags = '\0';
       a->seen = 0;
+      a->app_yes = NULL;
+      a->app_no = NULL;
       admin_open = qtrue;
     }
     else if( !Q_stricmp( t, "[ban]" ) )
@@ -2118,18 +2173,6 @@ qboolean G_admin_setlevel( gentity_t *ent, int skiparg )
   G_SayArgv( 2 + skiparg, lstr, sizeof( lstr ) );
   l = atoi( lstr );
 
-if( G_SayArgc() > 3 + skiparg ) {
-  allowed = qfalse;
-  for(i = 0; i < G_SayArgc() - (3 + skiparg); i++) {
-    G_SayArgv( 3 + skiparg + i, lstr, sizeof( lstr ) );
-    tmp = atoi( lstr );
-    if(tmp == ent->client->pers.adminLevel) allowed = qtrue;
-  }
-}
-  if( ent && !allowed ) {
-    ADMP( "^3!setlevel: ^7can't set someone of that current level\n" );
-    return qfalse;
-  }
 
   if( ent && l > ent->client->pers.adminLevel )
   {
@@ -2187,6 +2230,18 @@ if( G_SayArgc() > 3 + skiparg ) {
     return qfalse;
   }
 
+if( G_SayArgc() > 3 + skiparg ) {
+  allowed = qfalse;
+  for(i = 0; i < G_SayArgc() - (3 + skiparg); i++) {
+    G_SayArgv( 3 + skiparg + i, lstr, sizeof( lstr ) );
+    tmp = atoi( lstr );
+    if(tmp == vic->client->pers.adminLevel) allowed = qtrue;
+  }
+}
+  if( !allowed ) {
+    AP( "print \"^3!setlevel: ^7can't set someone of that current level\n\"" );
+    return qfalse;
+  }
   if( !Q_stricmp( guid, "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX" ) )
   {
     ADMP( va( "^3!setlevel: ^7%s does not have a valid GUID\n", adminname ) );
@@ -7147,6 +7202,18 @@ void G_admin_cleanup()
   }
   for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
   {
+    while( g_admin_admins[ i ]->app_yes ) {
+      g_admin_guid_chain *cur = g_admin_admins[ i ]->app_yes;
+      g_admin_admins[ i ]->app_yes = cur->next;
+      
+      G_Free( cur );
+    }
+    while( g_admin_admins[ i ]->app_no ) {
+      g_admin_guid_chain *cur = g_admin_admins[ i ]->app_no;
+      g_admin_admins[ i ]->app_no = cur->next;
+      
+      G_Free( cur );
+    }
     G_Free( g_admin_admins[ i ] );
     g_admin_admins[ i ] = NULL;
   }
@@ -7432,13 +7499,13 @@ qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
   char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
   int minargc;
   gentity_t *vic;
+  int class;
 
-
-    minargc = 2 + skiparg;
+  minargc = 2 + skiparg;
 
   if( G_SayArgc() < minargc )
   {
-    ADMP( "^3!forcespawn: ^7usage: !forcespawn [name|slot#] <0-granger 1-human default-auto>\n" );
+    ADMP( "^3!forcespawn: ^7usage: !forcespawn [^3name|slot#^7] (^5class^7)\n" );
     return qfalse;
   }
   G_SayArgv( 1 + skiparg, name, sizeof( name ) );
@@ -7451,52 +7518,57 @@ qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
   }
 
   vic = &g_entities[ pids[ 0 ] ];
-if (vic->client->pers.teamSelection == PTE_NONE && 0)
- {
- ADMP( "^3!forcespawn: ^7player not on a team\n" );
-
+  if (vic->client->pers.teamSelection == PTE_NONE && 0)
+  {
+    ADMP( "^3!forcespawn: ^7player not on a team\n" );
+    return qfalse;
+  }
+  if ( vic->client->pers.classSelection != PCL_NONE && 0)
+  {
+    ADMP( "^3!forcespawn: ^7player already spawned\n" );
         return qfalse;
- }
- if ( vic->client->pers.classSelection != PCL_NONE && 0)
- {
- ADMP( "^3!forcespawn: ^7player already spawned\n" );
-
+  }
+  
+  if( G_SayArgc() == minargc + 1) {
+    G_SayArgv(2 + skiparg, name, sizeof( name ) );
+    
+    class = BG_FindClassNumForName( name );
+    if( class == PCL_NONE || class == PCL_HUMAN || class == PCL_HUMAN_BSUIT ) {
+      class = PCL_HUMAN;
+      if( !Q_stricmp( name, BG_FindNameForWeapon( WP_MACHINEGUN ) ) )
+        vic->client->pers.humanItemSelection = WP_MACHINEGUN;
+      else if( !Q_stricmp( name, BG_FindNameForWeapon( WP_HBUILD ) ) )
+        vic->client->pers.humanItemSelection = WP_HBUILD;
+      else if( !Q_stricmp( name, BG_FindNameForWeapon( WP_HBUILD2 ) ) )
+        vic->client->pers.humanItemSelection = WP_HBUILD2;
+      else {
+        ADMP( "^3!forcespawn: ^7invalid class\n" );
         return qfalse;
- }
-
-//player_die(vic, NULL, NULL, 0, MOD_SUICIDE );
-
-
-        ClientUserinfoChanged( pids[ 0 ], qtrue );
-              vic->client->sess.sessionTeam = TEAM_FREE;
-if( vic->client->pers.teamSelection == PTE_HUMANS ) {
-    vic->client->pers.classSelection = PCL_HUMAN;
-} else if( g_alienStage.integer == 0 ) {
-    vic->client->pers.classSelection = PCL_ALIEN_BUILDER0;
-} else {
-    vic->client->pers.classSelection = PCL_ALIEN_BUILDER0_UPG;
-}
-
-if( G_SayArgc() == minargc + 1) {
-G_SayArgv(2 + skiparg, name, sizeof( name ) );
-if( !strcmp(name, "0") ) {
-if( g_alienStage.integer == 0 ) {
-    vic->client->pers.classSelection = PCL_ALIEN_BUILDER0;
-} else {
-    vic->client->pers.classSelection = PCL_ALIEN_BUILDER0_UPG;
-}
-}
-if( !strcmp(name, "1") ) {
-    vic->client->pers.classSelection = PCL_HUMAN;
-}
-}
-vic->client->pers.humanItemSelection = WP_HBUILD;
-vic->client->pers.evolveHealthFraction = 1.;
-VectorCopy( ent->s.origin, vic->s.pos.trBase );
-ClientSpawn(vic, vic, vic->s.pos.trBase, ent->client ? ent->client->ps.viewangles : ent->s.angles2 ); // ent->s.apos.trBase
-        ClientUserinfoChanged( pids[ 0 ], qtrue );
-        return qtrue;
-
+      }
+    }
+  } else {
+    if( vic->client->pers.teamSelection == PTE_HUMANS && g_alienStage.integer == 0 ) {
+        class = PCL_HUMAN;
+        vic->client->pers.humanItemSelection = WP_HBUILD;
+    } else if( vic->client->pers.teamSelection == PTE_HUMANS ) {
+        class = PCL_HUMAN;
+        vic->client->pers.humanItemSelection = WP_HBUILD2;
+    } else if( vic->client->pers.teamSelection == PTE_ALIENS && g_alienStage.integer == 0 ) {
+        class = PCL_ALIEN_BUILDER0;
+    } else {
+        class = PCL_ALIEN_BUILDER0_UPG;
+    }
+  }
+  
+  vic->client->pers.classSelection = class;
+  vic->client->sess.sessionTeam = TEAM_FREE;
+  ClientUserinfoChanged( pids[ 0 ], qtrue );
+  
+  vic->client->pers.evolveHealthFraction = 1.;
+  VectorCopy( ent->s.origin, vic->s.pos.trBase );
+  ClientSpawn(vic, vic, vic->s.pos.trBase, ent->client ? ent->client->ps.viewangles : ent->s.angles2 ); // ent->s.apos.trBase
+  ClientUserinfoChanged( pids[ 0 ], qtrue );
+  return qtrue;
 }
 
 qboolean G_admin_explode( gentity_t *ent, int skiparg )
@@ -7590,3 +7662,334 @@ G_AddCreditToClient( vic->client, atoi( arg ), qfalse );
 return qtrue;
 }
 
+
+
+g_admin_guid_chain g_admin_guid_chain_dummy;
+
+typedef struct {
+  int ts;
+  int index;
+}
+g_admin_app_item;
+
+int cmp_app( const void *pa, const void *pb )
+{
+  g_admin_app_item *a = (g_admin_app_item *)pa;
+  g_admin_app_item *b = (g_admin_app_item *)pb;
+  
+  if( a->ts > b->ts ) return -1;
+  return 1;
+}
+
+void G_admin_count_votes( g_admin_admin_t *admin, int *self_yes, int *votes_yes, int *votes_no, int *votes_admin_no, int *your_vote, char *your_guid )
+{
+  g_admin_guid_chain *cur;
+  
+  if( your_vote ) *your_vote = 0;
+  
+  if( self_yes || votes_yes || your_vote )
+  {
+    cur = admin->app_yes;
+    if( self_yes ) *self_yes = 0;
+    if( votes_yes ) *votes_yes = 0;
+    while( cur )
+    {
+      if( votes_yes ) (*votes_yes)++;
+      if( your_vote && strcmp( your_guid, cur->guid) == 0 ) (*your_vote) = 1;
+      if( self_yes && strcmp( admin->guid, cur->guid) == 0 ) (*self_yes)++;
+      cur = cur->next;
+    }
+  }
+  
+  if( votes_no || votes_admin_no || your_vote )
+  {
+    cur = admin->app_no;
+    if( votes_no ) *votes_no = 0;
+    if( votes_admin_no ) *votes_admin_no = 0;
+    while( cur )
+    {
+      if( votes_no ) (*votes_no)++;
+      if( your_vote && strcmp( your_guid, cur->guid) == 0 ) (*your_vote) = -1;
+      if( votes_admin_no && G_admin_permission_guid( cur->guid, "appdenier" ) )
+        (*votes_admin_no)++;
+      cur = cur->next;
+    }
+  }
+}
+
+qboolean is_int( char *arg )
+{
+    int i = 0;
+    while( arg[ i ] )
+    {
+      if( ( arg[ i ] < '0' || arg[ i ] > '9' ) && arg[ i ] != '-')
+        return qfalse;
+      i++;
+    }
+    return arg[0] != 0;
+}
+
+qboolean G_admin_applist( gentity_t *ent, int skiparg )
+{
+  int i;
+  char arg[ 64 ];
+  int page;
+  int apps_count;
+  g_admin_app_item apps[ MAX_ADMIN_ADMINS ];
+  
+  if( G_SayArgc() == skiparg + 1 )
+  {
+    page = 1;
+  }
+  else if( G_SayArgc() == skiparg + 2 )
+  {
+    G_SayArgv( skiparg + 1, arg, sizeof( arg ) );
+    if( !is_int( arg ) )
+      goto usage;
+    page = atoi( arg );
+  }
+  else
+  {
+    goto usage;
+  }
+  
+  apps_count = 0;
+  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
+  {
+    int self_yes;
+    
+    if( !G_admin_permission_admin( g_admin_admins[ i ], "applicable" ) )
+      continue;
+    
+    G_admin_count_votes( g_admin_admins[ i ], &self_yes, NULL, NULL, NULL, NULL, NULL );
+    
+    if( !self_yes )
+      continue;
+    
+    apps[ apps_count ].index = i;
+    apps[ apps_count ].ts = g_admin_admins[ i ]->seen;
+    
+    apps_count++;
+  }
+  
+  qsort( apps, apps_count, sizeof( apps[0] ), cmp_app );
+  
+  ADMP( va( "^3!applist: ^7page %i\n", page ) );
+  ADMP( va( "^7app#  ^2yes   ^1no(admin) ^7your  ^7lvl ^7name\n", page ) );
+  
+  page -= 1;
+  
+  for( i = page*10; i < page*10 + 10; i++ )
+  {
+    g_admin_admin_t *admin;
+    int votes_yes, votes_no, votes_admin_no, your_vote;
+    char *your_vote_str;
+    
+    if( i < 0 || i >= apps_count ) continue;
+    admin = g_admin_admins[ apps[ i ].index ];
+    
+    G_admin_count_votes( admin, NULL, &votes_yes, &votes_no, &votes_admin_no, &your_vote, ent->client->pers.guid );
+    
+    if( your_vote == -1 ) your_vote_str = "^1n";
+    else if( your_vote == 1 ) your_vote_str = "^2y";
+    else your_vote_str = "^7x";
+    
+    ADMP( va( "^7%4i ^2%4i ^1%4i(%5i)    %s ^7%4i ^7%s\n", apps[ i ].index, votes_yes, votes_no, votes_admin_no, your_vote_str, admin->level, admin->name ) );
+  }
+  
+  return qtrue;
+  
+usage:
+  ADMP( "^3!applist: ^7usage: !applist (^5page number^7)\n" );
+  return qfalse;
+}
+
+void G_admin_recompute_votes( g_admin_admin_t *admin )
+{
+  int self_yes, votes_yes, votes_no, votes_admin_no;
+  int newlevel;
+  
+  if( !G_admin_permission_admin( admin, "applicable" ) )
+    return;
+  
+  G_admin_count_votes( admin, &self_yes, &votes_yes, &votes_no, &votes_admin_no, NULL, NULL );
+ 
+  if( self_yes ) {
+    if( votes_admin_no > 3 ) {
+      newlevel = 1;
+    } else {
+      if( votes_yes - votes_no > 3 ) newlevel = 2;
+      if( votes_yes - votes_no < 3 ) newlevel = 1;
+      if( votes_yes - votes_no == 3 ) newlevel = admin->level;
+    }
+  } else {
+    newlevel = 1;
+  }
+  
+  if( admin->level != newlevel ) {
+    admin->level = newlevel;
+    AP( va( 
+      "print \"^3!setlevel: ^7%s^7 was given level %d admin rights by the people\n\"",
+      admin->name, newlevel ) );
+    admin_writeconfig();
+  }
+}
+
+void G_admin_recompute_votes_guid( char *guid )
+{
+  int i;
+  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
+  {
+    if( !Q_stricmp( g_admin_admins[ i ]->guid, guid ) )
+    {
+      G_admin_recompute_votes( g_admin_admins[ i ] );
+      break;
+    }
+  }
+}
+
+qboolean G_admin_appvote( gentity_t *ent, int skiparg )
+{
+  char arg[ 64 ];
+  int admin_index;
+  int vote;
+  g_admin_admin_t *admin;
+  g_admin_guid_chain *first;
+  g_admin_guid_chain *cur;
+  int self_yes;
+  int my_index;
+  int i;
+  int count;
+  char vote_name[ 64 ];
+  
+  if( !ent ) return qfalse;
+  
+  my_index = G_admin_get_admin_index( ent );
+  
+  if( G_SayArgc() >= skiparg + 2 )
+  {
+    G_SayArgv( skiparg + 1, vote_name, sizeof( vote_name ) );
+    if( strcmp( vote_name, "no" ) == 0 )
+      vote = -1;
+    else if( strcmp( vote_name, "x" ) == 0 )
+      vote = 0;
+    else if( strcmp( vote_name, "yes" ) == 0 )
+      vote = 1;
+    else
+      goto usage;
+  }
+  else
+  {
+    goto usage;
+  }
+  
+  count = G_SayArgc() - skiparg - 2;
+  if( count == 0)
+    count = 1;
+  
+  for( i = 0; i < count; i++ ) {
+    if( G_SayArgc() == skiparg + 2 ) {
+      admin_index = my_index;
+    } else {
+      G_SayArgv( skiparg + 2 + i, arg, sizeof( arg ) );
+      if( !is_int( arg ) ) {
+        ADMP( va( "^3!appvote: ^7%s - not an integer\n", arg ) );
+        continue;
+      }
+      admin_index = atoi( arg );
+    }
+    
+    if( admin_index == -1 && my_index == -1 )
+    {
+      ADMP( "^3!appvote: ^7you're not applicable - do !register\n" );
+      continue;
+    }
+    
+    if( admin_index < 0 || admin_index >= MAX_ADMIN_ADMINS )
+    {
+      ADMP( va( "^3!appvote: ^7%i - invalid app number\n", admin_index ) );
+      continue;
+    }
+    
+    admin = g_admin_admins[ admin_index ];
+    
+    if( !admin )
+    {
+      ADMP( va( "^3!appvote: ^7%i - invalid app number\n", admin_index ) );
+      continue;
+    }
+    
+    if( !G_admin_permission_admin( admin, "applicable" ) )
+    {
+      ADMP( va( "^3!appvote: ^7%i (%s^7) - not applicable\n", admin_index, admin->name ) );
+      continue;
+    }
+
+    G_admin_count_votes( admin, &self_yes, NULL, NULL, NULL, NULL, NULL );
+    if( !self_yes && admin_index != my_index )
+    {
+      ADMP( va( "^3!appvote: ^7^7%i (%s^7) - hasn't applied\n", admin_index, admin->name ) );
+      continue;
+    }
+    
+    // check if already voted and remove
+    first = &g_admin_guid_chain_dummy;
+    first->guid[0] = 0;
+    
+    first->next = admin->app_no;
+    cur = first;
+    while( cur->next ) {
+      if( strcmp( cur->next->guid, ent->client->pers.guid ) == 0 ) {
+        g_admin_guid_chain *to_free = cur->next;
+        cur->next = cur->next->next;
+        G_Free( to_free );
+      }
+      else
+        cur = cur->next;
+    }
+    admin->app_no = first->next;
+    
+    first->next = admin->app_yes;
+    cur = first;
+    while( cur->next ) {
+      if( strcmp( ent->client->pers.guid, cur->next->guid) == 0 ) {
+        g_admin_guid_chain *to_free = cur->next;
+        cur->next = cur->next->next;
+        G_Free( to_free );
+      }
+      else
+        cur = cur->next;
+    }
+    admin->app_yes = first->next;
+    
+    // set vote
+    if( vote == -1 || vote == 1)
+    {
+      g_admin_guid_chain *new = (g_admin_guid_chain *)G_Alloc( sizeof( g_admin_guid_chain ) );
+      memcpy( new->guid, ent->client->pers.guid, sizeof( new->guid ) );
+      
+      if( vote == -1 )
+      {
+        new->next = admin->app_no;
+        admin->app_no = new;
+      }
+      else
+      {
+        new->next = admin->app_yes;
+        admin->app_yes = new;
+      }
+    }
+    
+    admin_writeconfig();
+    
+    ADMP( va( "^3!appvote: ^7your vote '%s' for %s ^7confirmed.\n", vote_name, admin->name ) );
+    
+    G_admin_recompute_votes( admin );
+  }
+  
+  return qtrue;
+
+usage:
+  ADMP( "^3!appvote: ^7usage: !appvote [^3no/x/yes^7] (^5app# default=you^7) (^5more app#s ...^7)\n" );
+  return qfalse;
+}
