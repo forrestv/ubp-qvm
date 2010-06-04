@@ -536,10 +536,14 @@ char *G_admin_get_admin_name( gentity_t *ent ) {
 }
 
 int G_admin_get_admin_index( gentity_t *ent ) {
+  return G_admin_get_admin_index_from_guid( ent->client->pers.guid );
+}
+
+int G_admin_get_admin_index_from_guid( char* guid ) {
   int i;
   for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
   {
-    if( !Q_stricmp( g_admin_admins[ i ]->guid, ent->client->pers.guid ) )
+    if( !Q_stricmp( g_admin_admins[ i ]->guid, guid ) )
     {
       return i;
     }
@@ -3405,9 +3409,7 @@ void G_admin_seen_update( char *guid )
   {
     if( !Q_stricmp( g_admin_admins[ i ]->guid, guid ) )
     {
-      qtime_t qt;
-
-      g_admin_admins[ i ]->seen = trap_RealTime( &qt );
+      g_admin_admins[ i ]->seen = trap_RealTime( NULL );
       return;
     }
   }
@@ -7684,6 +7686,7 @@ int cmp_app( const void *pa, const void *pb )
 void G_admin_count_votes( g_admin_admin_t *admin, int *self_yes, int *votes_yes, int *votes_no, int *votes_admin_no, int *your_vote, char *your_guid )
 {
   g_admin_guid_chain *cur;
+  int cutoff = trap_RealTime( NULL ) - 60*60*24*3;
   
   if( your_vote ) *your_vote = 0;
   
@@ -7694,9 +7697,12 @@ void G_admin_count_votes( g_admin_admin_t *admin, int *self_yes, int *votes_yes,
     if( votes_yes ) *votes_yes = 0;
     while( cur )
     {
-      if( votes_yes ) (*votes_yes)++;
-      if( your_vote && strcmp( your_guid, cur->guid) == 0 ) (*your_vote) = 1;
-      if( self_yes && strcmp( admin->guid, cur->guid) == 0 ) (*self_yes)++;
+      int index = G_admin_get_admin_index_from_guid( cur->guid );
+      if( index != -1 && g_admin_admins[ index ]->seen > cutoff ) {
+        if( votes_yes ) (*votes_yes)++;
+        if( your_vote && strcmp( your_guid, cur->guid) == 0 ) (*your_vote) = 1;
+        if( self_yes && strcmp( admin->guid, cur->guid) == 0 ) (*self_yes)++;
+      }
       cur = cur->next;
     }
   }
@@ -7708,10 +7714,13 @@ void G_admin_count_votes( g_admin_admin_t *admin, int *self_yes, int *votes_yes,
     if( votes_admin_no ) *votes_admin_no = 0;
     while( cur )
     {
-      if( votes_no ) (*votes_no)++;
-      if( your_vote && strcmp( your_guid, cur->guid) == 0 ) (*your_vote) = -1;
-      if( votes_admin_no && G_admin_permission_guid( cur->guid, "appdenier" ) )
-        (*votes_admin_no)++;
+      int index = G_admin_get_admin_index_from_guid( cur->guid );
+      if( index != -1 && g_admin_admins[ index ]->seen > cutoff ) {
+        if( votes_no ) (*votes_no)++;
+        if( your_vote && strcmp( your_guid, cur->guid) == 0 ) (*your_vote) = -1;
+        if( votes_admin_no && G_admin_permission_guid( cur->guid, "appdenier" ) )
+          (*votes_admin_no)++;
+      }
       cur = cur->next;
     }
   }
@@ -7736,7 +7745,7 @@ qboolean G_admin_applist( gentity_t *ent, int skiparg )
   int page;
   int apps_count;
   g_admin_app_item apps[ MAX_ADMIN_ADMINS ];
-  
+  if( !ent) return qfalse; 
   if( G_SayArgc() == skiparg + 1 )
   {
     page = 1;
@@ -7815,12 +7824,12 @@ void G_admin_recompute_votes( g_admin_admin_t *admin )
   G_admin_count_votes( admin, &self_yes, &votes_yes, &votes_no, &votes_admin_no, NULL, NULL );
  
   if( self_yes ) {
-    if( votes_admin_no > 3 ) {
+    if( votes_admin_no > 4 ) {
       newlevel = 1;
     } else {
       if( votes_yes - votes_no > 3 ) newlevel = 2;
-      if( votes_yes - votes_no < 3 ) newlevel = 1;
-      if( votes_yes - votes_no == 3 ) newlevel = admin->level;
+      else if( votes_yes - votes_no < 2 ) newlevel = 1;
+      else newlevel = admin->level;
     }
   } else {
     newlevel = 1;
