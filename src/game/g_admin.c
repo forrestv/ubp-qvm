@@ -6357,8 +6357,7 @@ qboolean G_admin_slap( gentity_t *ent, int skiparg )
           " level than you\n" );
     return qfalse;
   }
-  if( vic->client->pers.teamSelection == PTE_NONE ||
-      vic->client->pers.classSelection == PCL_NONE )
+  if( vic->client->pers.classSelection == PCL_NONE )
   {
     ADMP( "^3!slap: ^7can't slap spectators\n" );
     return qfalse;
@@ -7604,8 +7603,7 @@ qboolean G_admin_explode( gentity_t *ent, int skiparg )
     return qfalse;
   }
   vic = &g_entities[ pids[ 0 ] ];
-  if( vic->client->pers.teamSelection == PTE_NONE ||
-      vic->client->pers.classSelection == PCL_NONE || vic->client->ps.pm_flags & PMF_QUEUED ) {
+  if( vic->client->pers.classSelection == PCL_NONE || vic->client->ps.pm_flags & PMF_QUEUED ) {
     ADMP( "^3!explode: ^7Can't explode thin air\n" );
     return qfalse;
   }
