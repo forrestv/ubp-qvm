@@ -5601,6 +5601,12 @@ qboolean G_admin_cancelvote( gentity_t *ent, int skiparg )
   level.teamVoteNo[ 1 ] = level.numConnectedClients;
   level.teamVoteYes[ 1 ] = 0;
   CheckTeamVote( PTE_ALIENS );
+  if( G_SayArgc() >= skiparg + 2 )
+  {
+  AP( va( "print \"^3!cancelvote: ^7%s^7 decided that everyone voted No. Reason: %s\n\"",
+          ( ent ) ? G_admin_adminPrintName( ent ) : "console", G_SayConcatArgs( 1 + skiparg ) ) );
+    return qtrue;
+  }
   AP( va( "print \"^3!cancelvote: ^7%s^7 decided that everyone voted No\n\"",
           ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
   return qtrue;
