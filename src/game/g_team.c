@@ -44,6 +44,11 @@ void QDECL PrintMsg( gentity_t *ent, const char *fmt, ... )
   trap_SendServerCommand( ( ( ent == NULL ) ? -1 : ent-g_entities ), va( "print \"%s\"", msg ) );
 }
 
+pTeam_t getEntTeam( gentity_t *ent ) {
+  if( ent->client ) return ent->client->pers.teamSelection;
+  if( ent->s.eType == ET_BUILDABLE ) return ent->biteam;
+  return PTE_NONE;
+}
 
 /*
 ==============
@@ -52,13 +57,7 @@ OnSameTeam
 */
 qboolean OnSameTeam( gentity_t *ent1, gentity_t *ent2 )
 {
-  if( !ent1->client || !ent2->client )
-    return qfalse;
-
-  if( ent1->client->pers.teamSelection == ent2->client->pers.teamSelection )
-    return qtrue;
-
-  return qfalse;
+  return getEntTeam( ent1 ) == getEntTeam( ent2 );
 }
 
 /*
