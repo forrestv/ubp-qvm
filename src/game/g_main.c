@@ -1496,7 +1496,7 @@ if( !level.extremeSuddenDeath )
       if( ent->s.eType != ET_BUILDABLE )
         continue;
       if( ent->s.modelindex == BA_A_BARRICADE || ent->s.modelindex == BA_A_ACIDTUBE || ent->s.modelindex == BA_A_TRAPPER ||
-          ent->s.modelindex == BA_A_HIVE || ent->s.modelindex == BA_H_MGTURRET || ent->s.modelindex == BA_H_TESLAGEN || ent->s.modelindex == BA_A_BOOSTER )
+          ent->s.modelindex == BA_A_HIVE || ent->s.modelindex == BA_H_MGTURRET || ent->s.modelindex == BA_H_TESLAGEN )
         G_Damage( ent, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
     }
         if( g_alienStage.integer < 2 )
