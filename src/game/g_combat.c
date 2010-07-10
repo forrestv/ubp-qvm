@@ -468,7 +468,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
       {
         self->client->pers.statscounters.feeds++;
         level.humanStatsCounters.feeds++;
-        AddScore( self, -1 );
+        //AddScore( self, -1 );
       }
     }
     else if( self->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
@@ -478,7 +478,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
       {
         self->client->pers.statscounters.feeds++;
         level.alienStatsCounters.feeds++;
-        AddScore( self, -1 );
+        //AddScore( self, -1 );
       }
     }
   }

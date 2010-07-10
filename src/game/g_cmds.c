@@ -287,7 +287,7 @@ void ScoreboardMessage( gentity_t *ent )
 
     Com_sprintf( entry, sizeof( entry ),
       " %d %d %d %d %d %d", level.sortedClients[ i ], cl->pers.score, ping, 
-      ( level.time - cl->pers.enterTime ) / 60000, weapon, upgrade );
+      cl->pers.statscounters.feeds, weapon, upgrade );
 
     j = strlen( entry );
 
