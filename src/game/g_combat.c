@@ -123,6 +123,286 @@ char *modNames[ ] =
   "MOD_SLAP"
 };
 
+static void Do_Obituary( gentity_t *target, gentity_t *attacker, int mod )
+{
+  char          *message;
+  char          *message2;
+  char          className[ 64 ];
+  qboolean      teamKill;
+  
+  if(!target || !target->client) return;
+  
+  if(!attacker || !attacker->client) {
+    teamKill = qfalse;
+  }
+  else
+  {
+    teamKill = attacker != target && attacker->client->ps.stats[ STAT_PTEAM ] == target->client->ps.stats[ STAT_PTEAM ];
+  }
+
+  // check for single client messages
+
+  switch( mod )
+  {
+    case MOD_SUICIDE:
+      message = "suicides";
+      break;
+    case MOD_FALLING:
+      message = "fell fowl to gravity";
+      break;
+    case MOD_CRUSH:
+      message = "was squished";
+      break;
+    case MOD_WATER:
+      message = "forgot to pack a snorkel";
+      break;
+    case MOD_SLIME:
+      message = "melted";
+      break;
+    case MOD_LAVA:
+      message = "does a back flip into the lava";
+      break;
+    case MOD_TARGET_LASER:
+      message = "saw the light";
+      break;
+    case MOD_TRIGGER_HURT:
+      message = "was in the wrong place";
+      break;
+    case MOD_HSPAWN:
+      message = "should have run further";
+      break;
+    case MOD_ASPAWN:
+      message = "shouldn't have trod in the acid";
+      break;
+    case MOD_MGTURRET:
+      message = "was gunned down by a turret";
+      break;
+    case MOD_TESLAGEN:
+      message = "was zapped by a tesla generator";
+      break;
+    case MOD_ATUBE:
+      message = "was melted by an acid tube";
+      break;
+    case MOD_OVERMIND:
+      message = "got too close to the overmind";
+      break;
+    case MOD_REACTOR:
+      message = "got too close to the reactor";
+      break;
+    case MOD_SLOWBLOB:
+      message = "should have visited a medical station";
+      break;
+    case MOD_SWARM:
+      message = "was hunted down by the swarm";
+      break;
+    default:
+      message = NULL;
+      break;
+  }
+
+  if( attacker == target )
+  {
+    gender_t gender = target->client->pers.sex;
+    switch( mod )
+    {
+      case MOD_FLAMER_SPLASH:
+        if( gender == GENDER_FEMALE )
+          message = "toasted herself";
+        else if( gender == GENDER_NEUTER )
+          message = "toasted itself";
+        else
+          message = "toasted himself";
+        break;
+
+      case MOD_LCANNON_SPLASH:
+        if( gender == GENDER_FEMALE )
+          message = "irradiated herself";
+        else if( gender == GENDER_NEUTER )
+          message = "irradiated itself";
+        else
+          message = "irradiated himself";
+        break;
+
+      case MOD_GRENADE:
+        if( gender == GENDER_FEMALE )
+          message = "blew herself up";
+        else if( gender == GENDER_NEUTER )
+          message = "blew itself up";
+        else
+          message = "blew himself up";
+        break;
+
+      default:
+        if( gender == GENDER_FEMALE )
+          message = "killed herself";
+        else if( gender == GENDER_NEUTER )
+          message = "killed itself";
+        else
+          message = "killed himself";
+        break;
+    }
+  }
+
+  if( message )
+  {
+    trap_SendServerCommand( -1,
+      va( "print \"%s^7 %s^7.\n\"",
+      target->client->pers.netname, message ) );
+    return;
+  }
+
+  message2 = "";
+  
+  if( attacker ) // is not world
+  {
+    switch( mod )
+    {
+      case MOD_PAINSAW:
+        message = "was sawn by";
+        break;
+      case MOD_BLASTER:
+        message = "was blasted by";
+        break;
+      case MOD_MACHINEGUN:
+        message = "was machinegunned by";
+        break;
+      case MOD_CHAINGUN:
+        message = "was chaingunned by";
+        break;
+      case MOD_SHOTGUN:
+        message = "was gunned down by";
+        break;
+      case MOD_PRIFLE:
+        message = "was pulse rifled by";
+        break;
+      case MOD_MDRIVER:
+        message = "was mass driven by";
+        break;
+      case MOD_LASGUN:
+        message = "was lasgunned by";
+        break;
+      case MOD_FLAMER:
+        message = "was grilled by";
+        message2 = "'s flamer";
+        break;
+      case MOD_FLAMER_SPLASH:
+        message = "was toasted by";
+        message2 = "'s flamer";
+        break;
+      case MOD_LCANNON:
+        message = "felt the full force of";
+        message2 = "'s lucifer cannon";
+        break;
+      case MOD_LCANNON_SPLASH:
+        message = "was caught in the fallout of";
+        message2 = "'s lucifer cannon";
+        break;
+      case MOD_GRENADE:
+        message = "couldn't escape";
+        message2 = "'s grenade";
+        break;
+
+      case MOD_ABUILDER_CLAW:
+        message = "should leave";
+        message2 = "'s buildings alone";
+        break;
+      case MOD_LEVEL0_BITE:
+        message = "was bitten by";
+        break;
+      case MOD_LEVEL1_CLAW:
+        message = "was swiped by";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL1 ) );
+        message2 = className;
+        break;
+      case MOD_LEVEL2_CLAW:
+        message = "was clawed by";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL2 ) );
+        message2 = className;
+        break;
+      case MOD_LEVEL2_ZAP:
+        message = "was zapped by";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL2 ) );
+        message2 = className;
+        break;
+      case MOD_LEVEL3_CLAW:
+        message = "was chomped by";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL3 ) );
+        message2 = className;
+        break;
+      case MOD_LEVEL3_POUNCE:
+        message = "was pounced upon by";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL3 ) );
+        message2 = className;
+        break;
+      case MOD_LEVEL3_BOUNCEBALL:
+        message = "was sniped by";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL3 ) );
+        message2 = className;
+        break;
+      case MOD_LEVEL4_CLAW:
+        message = "was mauled by";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL4 ) );
+        message2 = className;
+        break;
+      case MOD_LEVEL4_CHARGE:
+        message = "should have gotten out of the way of";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL4 ) );
+        message2 = className;
+        break;
+
+      case MOD_POISON:
+        message = "should have used a medkit against";
+        message2 = "'s poison";
+        break;
+      case MOD_LEVEL1_PCLOUD:
+        message = "was gassed by";
+        Com_sprintf( className, 64, "'s %s",
+            BG_FindHumanNameForClassNum( PCL_ALIEN_LEVEL1 ) );
+        message2 = className;
+        break;
+
+
+      case MOD_TELEFRAG:
+        message = "tried to invade";
+        message2 = "'s personal space";
+        break;
+      default:
+        message = "was killed by";
+        break;
+    }
+
+    if( message )
+    {
+      trap_SendServerCommand( -1,
+        va(
+        "print \"%s^7 %s %s%s^7%s\n\"",
+        target->client->pers.netname, message,
+        ( teamKill ) ? S_COLOR_RED "TEAMMATE " S_COLOR_WHITE : "",
+        (attacker && attacker->client) ? attacker->client->pers.netname : "<world>", message2
+        ) );
+      if( teamKill )
+      {
+        trap_SendServerCommand( attacker - g_entities,
+          va( "cp \"You killed ^1TEAMMATE^7 %s\"", target->client->pers.netname ) );
+      }
+      return;
+    }
+  }
+
+  // we don't know what it was
+  trap_SendServerCommand( -1,
+    va( "print \"%s^7 died.^7\n\"",
+    target->client->pers.netname ) );
+}
+
 /*
 ==================
 player_die
@@ -243,11 +523,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
   // broadcast the death event to everyone
   if( !tk )
   {
-    ent = G_TempEntity( self->r.currentOrigin, EV_OBITUARY );
-    ent->s.eventParm = meansOfDeath;
-    ent->s.otherEntityNum = self->s.number;
-    ent->s.otherEntityNum2 = killer;
-    ent->r.svFlags = SVF_BROADCAST; // send to everyone
+    Do_Obituary( self, attacker, meansOfDeath );
   }
   else if( attacker && attacker->client )
   {

@@ -429,6 +429,7 @@ typedef struct
   qboolean            useUnlagged;
   statsCounters_t     statscounters;
   int                 bubbleTime;
+  gender_t            sex;
 } clientPersistant_t;
 
 #define MAX_UNLAGGED_MARKERS 10
