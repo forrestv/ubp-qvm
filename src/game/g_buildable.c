@@ -1695,6 +1695,7 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 
   if( other ) {
     int cost = 1;
+    if(other->health < other->client->ps.stats[ STAT_MAX_HEALTH ] * .9) return;
     if(self->s.modelindex == BA_H_MEDISTAT && other->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS) return;
     if( other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) cost = cost * 175;
     if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * (g_epicSuddenDeath.integer ? 8 : 5) / 4 ) return;
