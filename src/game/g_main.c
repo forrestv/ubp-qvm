@@ -214,6 +214,8 @@ vmCvar_t  g_deconVote;
 vmCvar_t  g_epicSuddenDeath;
 vmCvar_t  g_epicSuddenDeathVotePercent;
 
+vmCvar_t  g_fueledjetpack;
+
 static cvarTable_t   gameCvarTable[ ] =
 {
   // don't override the cheat state set by the system
@@ -404,6 +406,8 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_allowShare, "g_allowShare", "0", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse},
   { &g_creditOverflow, "g_creditOverflow", "1", CVAR_ARCHIVE | CVAR_SERVERINFO, 0, qfalse},
   { &g_banNotice, "g_banNotice", "", CVAR_ARCHIVE, 0, qfalse  },
+
+  { &g_fueledjetpack, "g_fueledjetpack", "0", CVAR_ARCHIVE, 0, qfalse },
 
   { &g_proximityMines, "g_proximityMines", "0", 0, 0, qtrue  },
   { &g_blobBounce, "g_blobBounce", "0", 0, 0, qtrue  },

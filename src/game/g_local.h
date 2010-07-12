@@ -524,6 +524,8 @@ struct gclient_s
   qboolean            allowedToPounce;
 
   qboolean            charging;
+  
+  float               jetpackfuel;
 
   vec3_t              hovelOrigin;          // player origin before entering hovel
 
@@ -1431,6 +1433,8 @@ extern  vmCvar_t  g_vampireDeathTime;
 extern  vmCvar_t  g_vampireDeath;
 extern  vmCvar_t  g_vampireDeathVotePercent;
 extern  vmCvar_t  g_vampireDeathInfo;
+
+extern  vmCvar_t  g_fueledjetpack;
 
 void      trap_Printf( const char *fmt );
 void      trap_Error( const char *fmt );

@@ -475,6 +475,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define JETPACK_SINK_SPEED          192.0f //down movement speed
 #define JETPACK_DISABLE_TIME        1000 //time to disable the jetpack when player damaged
 #define JETPACK_DISABLE_CHANCE      0.3f
+#define JETPACK_MAX_FUEL            60
+#define JETPACK_REGEN_RATE          3
+#define JETPACK_USE_RATE            2
 
 #define BSUIT_PRICE                 400
 #define BSUIT_POISON_PROTECTION     4
