@@ -1356,7 +1356,7 @@ void ClientUserinfoChanged( int clientNum, qboolean forceName )
   
   client->pers.sex = GENDER_NEUTER;
   if( Q_stricmp( "male", Info_ValueForKey( userinfo, "sex" ) ) == 0 ) client->pers.sex = GENDER_MALE;
-  if( Q_stricmp( "male", Info_ValueForKey( userinfo, "sex" ) ) == 0 ) client->pers.sex = GENDER_FEMALE;
+  if( Q_stricmp( "female", Info_ValueForKey( userinfo, "sex" ) ) == 0 ) client->pers.sex = GENDER_FEMALE;
 
   team = client->pers.teamSelection;
 
