@@ -7664,6 +7664,8 @@ if (vic->client->pers.teamSelection == PTE_NONE )
  }
     G_SayArgv( 2 + skiparg, arg, sizeof arg );
 
+  AP( va( "print \"^3!givefunds: ^7%s^7 gave ^7%s^7 %i funds"
+      "\n\"", ( ent ) ? ent->client->pers.netname : "console", ( vic ) ? vic->client->pers.netname : "console", atoi(arg) ) );
 G_AddCreditToClient( vic->client, atoi( arg ), qfalse );
 return qtrue;
 }
