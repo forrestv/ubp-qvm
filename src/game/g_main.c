@@ -2516,7 +2516,7 @@ void CheckExitRules( void )
     trap_SetConfigstring( CS_WINNER, "Humans Win" );
     LogExit( "Humans win." );
     G_admin_maplog_result( "h" );
-	if( level.time <= level.startTime + 180000 )
+	if( level.time <= level.startTime + 180000 && 0 )
 	{
 	  trap_SendConsoleCommand( EXEC_APPEND, "map_restart" );
 	  }
@@ -2532,7 +2532,7 @@ void CheckExitRules( void )
     trap_SetConfigstring( CS_WINNER, "Aliens Win" );
     LogExit( "Aliens win." );
     G_admin_maplog_result( "a" );
-	if( level.time <= level.startTime + 180000 )
+	if( level.time <= level.startTime + 180000 && 0 )
 	{
 	  trap_SendConsoleCommand( EXEC_APPEND, "map_restart" );
 	  }
