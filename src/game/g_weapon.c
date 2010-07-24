@@ -1078,7 +1078,7 @@ static zap_t  zaps[ MAX_CLIENTS ];
 G_FindNewZapTarget
 ===============
 */
-static gentity_t *G_FindNewZapTarget( gentity_t *ent )
+static gentity_t *G_FindNewZapTarget( gentity_t *ent, qboolean heal )
 {
   int       entityList[ MAX_GENTITIES ];
   vec3_t    range = { LEVEL2_AREAZAP_RANGE, LEVEL2_AREAZAP_RANGE, LEVEL2_AREAZAP_RANGE };
@@ -1086,6 +1086,10 @@ static gentity_t *G_FindNewZapTarget( gentity_t *ent )
   int       i, j, k, num;
   gentity_t *enemy;
   trace_t   tr;
+  if( heal ) {
+    vec3_t    new_range = { LEVEL2_AREAZAP_RANGE, LEVEL2_AREAZAP_RANGE, LEVEL2_AREAZAP_RANGE };
+    VectorCopy( new_range, range );
+  }
 
   //VectorScale( range, 1.0f / M_ROOT3, range );
   VectorAdd( ent->s.origin, range, maxs );
@@ -1097,13 +1101,15 @@ static gentity_t *G_FindNewZapTarget( gentity_t *ent )
   {
     enemy = &g_entities[ entityList[ i ] ];
 
-    if( ( ( enemy->client && enemy->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
+    if( (!heal && ( ( ( enemy->client && enemy->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
         ( enemy->s.eType == ET_BUILDABLE &&
-          BG_FindTeamForBuildable( enemy->s.modelindex ) == BIT_HUMANS ) ) && enemy->health > 0 )
+          BG_FindTeamForBuildable( enemy->s.modelindex ) == BIT_HUMANS ) ) && enemy->health > 0 ) )
+        || ( heal && ( enemy->client || enemy->s.eType == ET_BUILDABLE ) && enemy->health > 0 ) )
     {
       qboolean foundOldTarget = qfalse;
 
-      if( Distance( ent->s.origin, enemy->s.origin ) > LEVEL2_AREAZAP_RANGE ) continue;
+      if( !heal && Distance( ent->s.origin, enemy->s.origin ) > LEVEL2_AREAZAP_RANGE ) continue;
+      if( heal && Distance( ent->s.origin, enemy->s.origin ) > LEVEL2_AREAZAP2_RANGE ) continue;
 
       trap_Trace( &tr, muzzle, NULL, NULL, enemy->s.origin, ent->s.number, MASK_SHOT );
 
@@ -1177,7 +1183,7 @@ static void G_UpdateZapEffect( zap_t *zap )
 G_CreateNewZap
 ===============
 */
-static void G_CreateNewZap( gentity_t *creator, gentity_t *target )
+static void G_CreateNewZap( gentity_t *creator, gentity_t *target, qboolean heal )
 {
   int       i, j;
   zap_t     *zap;
@@ -1197,10 +1203,11 @@ static void G_CreateNewZap( gentity_t *creator, gentity_t *target )
 
       zap->targets[ 0 ] = target;
       zap->numTargets = 1;
+      zap->heal = heal;
 
       for( j = 1; j < MAX_ZAP_TARGETS && zap->targets[ j - 1 ]; j++ )
       {
-        zap->targets[ j ] = G_FindNewZapTarget( zap->targets[ j - 1 ] );
+        zap->targets[ j ] = G_FindNewZapTarget( zap->targets[ j - 1 ], heal );
 
         if( zap->targets[ j ] )
           zap->numTargets++;
@@ -1244,9 +1251,10 @@ void G_UpdateZaps( int msec )
           source = zap->targets[ j - 1 ];
 
         if( target->health <= 0 || !target->inuse || //early out
-            Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP_RANGE )
+            (!zap->heal && Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP_RANGE ) ||
+            (zap->heal && Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP2_RANGE ) )
         {
-          target = zap->targets[ j ] = G_FindNewZapTarget( source );
+          target = zap->targets[ j ] = G_FindNewZapTarget( source, zap->heal );
 
           //couldn't find a target, so forget about the rest of the chain
           if( !target )
@@ -1263,6 +1271,7 @@ void G_UpdateZaps( int msec )
           float     r = 1.0f / zap->numTargets;
           float     damageFraction = 2 * r - 2 * j * r * r - r * r;
           vec3_t    forward;
+          int dmg = zap->heal ? LEVEL2_AREAZAP2_DMG : LEVEL2_AREAZAP_DMG;
 
           if( j == 0 )
             source = zap->creator;
@@ -1270,11 +1279,11 @@ void G_UpdateZaps( int msec )
             source = zap->targets[ j - 1 ];
 
           damage = ceil( ( (float)msec / LEVEL2_AREAZAP_TIME ) *
-              LEVEL2_AREAZAP_DMG * damageFraction );
+              dmg * damageFraction );
 
           // don't let a high msec value inflate the total damage
-          if( damage + zap->damageUsed > LEVEL2_AREAZAP_DMG )
-            damage = LEVEL2_AREAZAP_DMG - zap->damageUsed;
+          if( damage + zap->damageUsed > dmg )
+            damage = dmg - zap->damageUsed;
 
           VectorSubtract( target->s.origin, source->s.origin, forward );
           VectorNormalize( forward );
@@ -1307,7 +1316,7 @@ void G_UpdateZaps( int msec )
 areaZapFire
 ===============
 */
-void areaZapFire( gentity_t *ent )
+void areaZapFire( gentity_t *ent, qboolean heal )
 {
   trace_t   tr;
   vec3_t    end;
@@ -1322,9 +1331,15 @@ void areaZapFire( gentity_t *ent )
 
   CalcMuzzlePoint( ent, forward, right, up, muzzle );
 
-  VectorMA( muzzle, LEVEL2_AREAZAP_RANGE, forward, end );
+  if( heal )
+    VectorMA( muzzle, LEVEL2_AREAZAP2_RANGE, forward, end );
+  else
+    VectorMA( muzzle, LEVEL2_AREAZAP_RANGE, forward, end );
 
-  G_UnlaggedOn( ent, muzzle, LEVEL2_AREAZAP_RANGE );
+  if( heal )
+    G_UnlaggedOn( ent, muzzle, LEVEL2_AREAZAP2_RANGE );
+  else
+    G_UnlaggedOn( ent, muzzle, LEVEL2_AREAZAP_RANGE );
   trap_Trace( &tr, muzzle, mins, maxs, end, ent->s.number, MASK_SHOT );
   G_UnlaggedOff( );
 
@@ -1333,11 +1348,19 @@ void areaZapFire( gentity_t *ent )
 
   traceEnt = &g_entities[ tr.entityNum ];
 
+  if( heal ) {
+    if( ( traceEnt->client || traceEnt->s.eType == ET_BUILDABLE ) && traceEnt->health > 0 )
+    {
+      G_CreateNewZap( ent, traceEnt, qtrue );
+    }
+    return;
+  }
+
   if( ( ( traceEnt->client && traceEnt->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
       ( traceEnt->s.eType == ET_BUILDABLE &&
         BG_FindTeamForBuildable( traceEnt->s.modelindex ) == BIT_HUMANS ) ) && traceEnt->health > 0 )
   {
-    G_CreateNewZap( ent, traceEnt );
+    G_CreateNewZap( ent, traceEnt, qfalse );
   }
 }
 
@@ -1501,6 +1524,9 @@ void FireWeapon3( gentity_t *ent )
   // fire the specific weapon
   switch( ent->s.weapon )
   {
+    case WP_ALEVEL2_UPG:
+      areaZapFire( ent, qtrue );
+      break;
     case WP_ALEVEL3_UPG:
       bounceBallFire( ent );
       break;
@@ -1540,7 +1566,7 @@ void FireWeapon2( gentity_t *ent )
       poisonCloud( ent );
       break;
     case WP_ALEVEL2_UPG:
-      areaZapFire( ent );
+      areaZapFire( ent, qfalse );
       break;
 
     case WP_LUCIFER_CANNON:
