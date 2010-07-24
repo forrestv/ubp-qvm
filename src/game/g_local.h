@@ -1049,6 +1049,7 @@ typedef struct zap_s
   int           damageUsed;
 
   gentity_t     *effectChannel;
+  qboolean heal;
 } zap_t;
 
 void      G_ForceWeaponChange( gentity_t *ent, weapon_t weapon );
