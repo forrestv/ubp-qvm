@@ -1710,8 +1710,10 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
     }
   }
 
-  if( take < 1 )
+  if( take == 0 )
     take = 1;
+  if( take < 0 && targ->health >= client->ps.stats[ STAT_MAX_HEALTH ] )
+    return;
 
   if( g_debugDamage.integer )
   {
@@ -1728,7 +1730,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
       takeNoOverkill = 0;
   }
 
-  if( OnSameTeam( targ, attacker ) && targ != attacker ) {
+  if( OnSameTeam( targ, attacker ) && targ != attacker && take > 0 ) {
     gentity_t *oldtarg = targ;
     int oldtake = take;
     
@@ -1863,6 +1865,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
     
     //Do the damage
     targ->health = targ->health - take;
+    
+    if( take < 0 && targ->health >= client->ps.stats[ STAT_MAX_HEALTH ] )
+      targ->health = client->ps.stats[ STAT_MAX_HEALTH ];
 
     if( targ->client )
       targ->client->ps.stats[ STAT_HEALTH ] = targ->health;

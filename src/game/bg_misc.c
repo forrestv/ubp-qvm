@@ -3560,11 +3560,11 @@ weaponAttributes_t bg_weapons[ ] =
     qfalse,               //int       usesEnergy;
     LEVEL2_CLAW_U_REPEAT, //int       repeatRate1;
     LEVEL2_AREAZAP_REPEAT,//int       repeatRate2;
-    0,                    //int       repeatRate3;
+    LEVEL2_AREAZAP2_REPEAT,                    //int       repeatRate3;
     0,                    //int       reloadTime;
     LEVEL2_CLAW_U_K_SCALE,//float     knockbackScale;
     qtrue,                //qboolean  hasAltMode;
-    qfalse,               //qboolean  hasThirdMode;
+    qtrue,               //qboolean  hasThirdMode;
     qfalse,               //qboolean  canZoom;
     90.0f,                //float     zoomFov;
     qtrue,               //qboolean  purchasable;

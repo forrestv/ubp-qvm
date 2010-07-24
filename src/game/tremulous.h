@@ -78,11 +78,14 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define LEVEL2_CLAW_U_REPEAT        400
 #define LEVEL2_CLAW_U_K_SCALE       1.0f
 #define LEVEL2_AREAZAP_DMG          ADM(80)
-#define LEVEL2_AREAZAP_RANGE        20000.0f
+#define LEVEL2_AREAZAP_RANGE        200.0f
 #define LEVEL2_AREAZAP_WIDTH        15.0f
 #define LEVEL2_AREAZAP_REPEAT       1500
 #define LEVEL2_AREAZAP_TIME         1000
 #define LEVEL2_AREAZAP_MAX_TARGETS  3
+#define LEVEL2_AREAZAP2_DMG          ADM(-50)
+#define LEVEL2_AREAZAP2_RANGE       2000
+#define LEVEL2_AREAZAP2_REPEAT      1000
 #define LEVEL2_WALLJUMP_MAXSPEED    1000.0f
 
 #define LEVEL3_CLAW_DMG             ADM(80)
@@ -475,9 +478,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define JETPACK_SINK_SPEED          192.0f //down movement speed
 #define JETPACK_DISABLE_TIME        1000 //time to disable the jetpack when player damaged
 #define JETPACK_DISABLE_CHANCE      0.3f
-#define JETPACK_MAX_FUEL            60
-#define JETPACK_REGEN_RATE          3
-#define JETPACK_USE_RATE            2
 
 #define BSUIT_PRICE                 400
 #define BSUIT_POISON_PROTECTION     4
