@@ -1730,7 +1730,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
       takeNoOverkill = 0;
   }
 
-  if( OnSameTeam( targ, attacker ) && targ != attacker && take > 0 ) {
+  if( OnSameTeam( targ, attacker ) && targ != attacker && take > 0 && targ->s.eType != ET_BUILDABLE ) {
     gentity_t *oldtarg = targ;
     int oldtake = take;
     
