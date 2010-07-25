@@ -1101,15 +1101,15 @@ static gentity_t *G_FindNewZapTarget( gentity_t *ent, qboolean heal )
   {
     enemy = &g_entities[ entityList[ i ] ];
 
-    if( (!heal && ( ( ( enemy->client && enemy->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
-        ( enemy->s.eType == ET_BUILDABLE &&
-          BG_FindTeamForBuildable( enemy->s.modelindex ) == BIT_HUMANS ) ) && enemy->health > 0 ) )
-        || ( heal && ( enemy->client || enemy->s.eType == ET_BUILDABLE ) && enemy->health > 0 ) )
+    if(enemy->health > 0 && (
+        (!heal && !OnSameTeam( ent, enemy) && ( enemy->client || enemy->s.eType == ET_BUILDABLE ) ) ||
+        ( heal &&  OnSameTeam( ent, enemy) &&   enemy->client )
+    ) )
     {
       qboolean foundOldTarget = qfalse;
 
-      if( !heal && Distance( ent->s.origin, enemy->s.origin ) > LEVEL2_AREAZAP_RANGE ) continue;
-      if( heal && Distance( ent->s.origin, enemy->s.origin ) > LEVEL2_AREAZAP2_RANGE ) continue;
+      if( !heal && Distance( ent->s.origin, enemy->s.origin ) > LEVEL2_AREAZAP_RANGE  ) continue;
+      if(  heal && Distance( ent->s.origin, enemy->s.origin ) > LEVEL2_AREAZAP2_RANGE ) continue;
 
       trap_Trace( &tr, muzzle, NULL, NULL, enemy->s.origin, ent->s.number, MASK_SHOT );
 
@@ -1251,8 +1251,8 @@ void G_UpdateZaps( int msec )
           source = zap->targets[ j - 1 ];
 
         if( target->health <= 0 || !target->inuse || //early out
-            (!zap->heal && Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP_RANGE ) ||
-            (zap->heal && Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP2_RANGE ) )
+            (!zap->heal && Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP_RANGE  ) ||
+            ( zap->heal && Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP2_RANGE ) )
         {
           target = zap->targets[ j ] = G_FindNewZapTarget( source, zap->heal );
 
@@ -1320,7 +1320,7 @@ void areaZapFire( gentity_t *ent, qboolean heal )
 {
   trace_t   tr;
   vec3_t    end;
-  gentity_t *traceEnt;
+  gentity_t *enemy;
   vec3_t    mins, maxs;
 
   VectorSet( mins, -LEVEL2_AREAZAP_WIDTH, -LEVEL2_AREAZAP_WIDTH, -LEVEL2_AREAZAP_WIDTH );
@@ -1346,21 +1346,14 @@ void areaZapFire( gentity_t *ent, qboolean heal )
   if( tr.surfaceFlags & SURF_NOIMPACT )
     return;
 
-  traceEnt = &g_entities[ tr.entityNum ];
+  enemy = &g_entities[ tr.entityNum ];
 
-  if( heal ) {
-    if( ( traceEnt->client || traceEnt->s.eType == ET_BUILDABLE ) && traceEnt->health > 0 )
-    {
-      G_CreateNewZap( ent, traceEnt, qtrue );
-    }
-    return;
-  }
-
-  if( ( ( traceEnt->client && traceEnt->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) ||
-      ( traceEnt->s.eType == ET_BUILDABLE &&
-        BG_FindTeamForBuildable( traceEnt->s.modelindex ) == BIT_HUMANS ) ) && traceEnt->health > 0 )
+  if(enemy->health > 0 && (
+      (!heal && !OnSameTeam( ent, enemy) && ( enemy->client || enemy->s.eType == ET_BUILDABLE ) ) ||
+      ( heal &&  OnSameTeam( ent, enemy) &&   enemy->client )
+  ) )
   {
-    G_CreateNewZap( ent, traceEnt, qfalse );
+    G_CreateNewZap( ent, enemy, heal );
   }
 }
 
@@ -1573,10 +1566,11 @@ void FireWeapon2( gentity_t *ent )
       LCChargeFire( ent, qtrue );
       break;
 
+    case WP_HBUILD2:
+      areaZapFire( ent, qtrue );
     case WP_ABUILD:
     case WP_ABUILD2:
     case WP_HBUILD:
-    case WP_HBUILD2:
       cancelBuildFire( ent );
       break;
     default:

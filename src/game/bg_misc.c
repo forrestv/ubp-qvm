@@ -3384,7 +3384,7 @@ weaponAttributes_t bg_weapons[ ] =
     qtrue,                //int       infiniteAmmo;
     qfalse,               //int       usesEnergy;
     HBUILD2_REPEAT,       //int       repeatRate1;
-    HBUILD2_REPEAT,       //int       repeatRate2;
+    LEVEL2_AREAZAP2_REPEAT, //int       repeatRate2;
     0,                    //int       repeatRate3;
     0,                    //int       reloadTime;
     0.0f,                 //float     knockbackScale;
