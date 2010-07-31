@@ -1661,6 +1661,9 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
   take = damage;
   save = 0;
 
+  if( take < 0 && targ->health >= client->ps.stats[ STAT_MAX_HEALTH ] )
+    return;
+  
   // add to the damage inflicted on a player this frame
   // the total will be turned into screen blends and view angle kicks
   // at the end of the frame
@@ -1712,8 +1715,6 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
   if( take == 0 )
     take = 1;
-  if( take < 0 && targ->health >= client->ps.stats[ STAT_MAX_HEALTH ] )
-    return;
 
   if( g_debugDamage.integer )
   {
@@ -1875,7 +1876,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
     targ->lastDamageTime = level.time;
 
     //TA: add to the attackers "account" on the target
-    if( targ->client && attacker->client )
+    if( targ->client && attacker->client && take > 0 )
     {
       if( attacker != targ && !OnSameTeam( targ, attacker ) )
         targ->credits[ attacker->client->ps.clientNum ] += take;
