@@ -1078,7 +1078,7 @@ static zap_t  zaps[ MAX_CLIENTS ];
 G_FindNewZapTarget
 ===============
 */
-static gentity_t *G_FindNewZapTarget( gentity_t *ent, qboolean heal )
+static gentity_t *G_FindNewZapTarget( gentity_t *creator, gentity_t *ent, qboolean heal )
 {
   int       entityList[ MAX_GENTITIES ];
   vec3_t    range = { LEVEL2_AREAZAP_RANGE, LEVEL2_AREAZAP_RANGE, LEVEL2_AREAZAP_RANGE };
@@ -1102,8 +1102,8 @@ static gentity_t *G_FindNewZapTarget( gentity_t *ent, qboolean heal )
     enemy = &g_entities[ entityList[ i ] ];
 
     if(enemy->health > 0 && (
-        (!heal && !OnSameTeam( ent, enemy) && ( enemy->client || enemy->s.eType == ET_BUILDABLE ) ) ||
-        ( heal &&  OnSameTeam( ent, enemy) &&   enemy->client )
+        (!heal && !OnSameTeam( creator, enemy) && ( enemy->client || enemy->s.eType == ET_BUILDABLE ) && enemy != creator ) ||
+        ( heal &&  OnSameTeam( creator, enemy) &&   enemy->client && enemy != creator )
     ) )
     {
       qboolean foundOldTarget = qfalse;
@@ -1207,7 +1207,7 @@ static void G_CreateNewZap( gentity_t *creator, gentity_t *target, qboolean heal
 
       for( j = 1; j < MAX_ZAP_TARGETS && zap->targets[ j - 1 ]; j++ )
       {
-        zap->targets[ j ] = G_FindNewZapTarget( zap->targets[ j - 1 ], heal );
+        zap->targets[ j ] = G_FindNewZapTarget( creator, zap->targets[ j - 1 ], heal );
 
         if( zap->targets[ j ] )
           zap->numTargets++;
@@ -1254,7 +1254,7 @@ void G_UpdateZaps( int msec )
             (!zap->heal && Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP_RANGE  ) ||
             ( zap->heal && Distance( source->s.origin, target->s.origin ) > LEVEL2_AREAZAP2_RANGE ) )
         {
-          target = zap->targets[ j ] = G_FindNewZapTarget( source, zap->heal );
+          target = zap->targets[ j ] = G_FindNewZapTarget( zap->creator, source, zap->heal );
 
           //couldn't find a target, so forget about the rest of the chain
           if( !target )
@@ -1291,7 +1291,7 @@ void G_UpdateZaps( int msec )
           //do the damage
           if( damage )
           {
-            G_Damage( target, source, zap->creator, forward, target->s.origin,
+            G_Damage( target, source, zap->creator, forward, zap->heal ? NULL : target->s.origin,
                     damage, DAMAGE_NO_KNOCKBACK | DAMAGE_NO_LOCDAMAGE, MOD_LEVEL2_ZAP );
             zap->damageUsed += damage;
           }
@@ -1349,8 +1349,8 @@ void areaZapFire( gentity_t *ent, qboolean heal )
   enemy = &g_entities[ tr.entityNum ];
 
   if(enemy->health > 0 && (
-      (!heal && !OnSameTeam( ent, enemy) && ( enemy->client || enemy->s.eType == ET_BUILDABLE ) ) ||
-      ( heal &&  OnSameTeam( ent, enemy) &&   enemy->client )
+      (!heal && !OnSameTeam( ent, enemy) && ( enemy->client || enemy->s.eType == ET_BUILDABLE ) && enemy != ent ) ||
+      ( heal &&  OnSameTeam( ent, enemy) &&   enemy->client && enemy != ent )
   ) )
   {
     G_CreateNewZap( ent, enemy, heal );
