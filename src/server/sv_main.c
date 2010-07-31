@@ -411,7 +411,6 @@ void SVC_Info( netadr_t from ) {
 	// don't count privateclients
 	count = 1;
 	for ( i = sv_privateClients->integer ; i < sv_maxclients->integer ; i++ ) {
-	for ( i = 0 ; i < sv_maxclients->integer ; i++ ) {
 		if ( svs.clients[i].state >= CS_CONNECTED ) {
 			count++;
 		}
