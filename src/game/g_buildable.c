@@ -2069,6 +2069,44 @@ void HArmoury_Think( gentity_t *self )
 }
 
 
+void HArmoury_Touch( gentity_t *self, gentity_t *other, trace_t *trace )
+{
+  gclient_t *client = other->client;
+  int       i;
+  int       maxAmmo, maxClips;
+
+  if( !self->spawned || self->health <= 0 )
+    return;
+
+  if( !self->powered )
+    return;
+
+  if( !client )
+    return;
+  
+  client->jetpackfuel = JETPACK_MAX_FUEL;
+
+  for( i = WP_NONE + 1; i < WP_NUM_WEAPONS; i++ )
+  {
+    if( BG_InventoryContainsWeapon( i, other->client->ps.stats ) &&
+        !BG_FindInfinteAmmoForWeapon( i ) &&
+        !BG_WeaponIsFull( i, client->ps.stats,
+          client->ps.ammo, client->ps.powerups ) )
+    {
+      BG_FindAmmoForWeapon( i, &maxAmmo, &maxClips );
+
+      if( BG_FindUsesEnergyForWeapon( i ) )
+      {
+        if( BG_InventoryContainsUpgrade( UP_BATTPACK, client->ps.stats ) )
+          maxAmmo = (int)( (float)maxAmmo * BATTPACK_MODIFIER );
+      }
+
+      BG_PackAmmoArray( i, client->ps.ammo, client->ps.powerups,
+                        maxAmmo, maxClips );
+    }
+  }
+
+}
 
 
 //==================================================================================
@@ -3773,6 +3811,7 @@ static gentity_t *G_Build( gentity_t *builder, buildable_t buildable, vec3_t ori
       built->think = HArmoury_Think;
       built->die = HSpawn_Die;
       built->use = HArmoury_Activate;
+      built->touch = HArmoury_Touch;
       break;
 
     case BA_H_DCC:

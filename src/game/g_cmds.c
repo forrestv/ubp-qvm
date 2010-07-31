@@ -1023,10 +1023,23 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText )
   // don't let text be too long for malicious reasons
   char        text[ MAX_SAY_TEXT ];
   char        location[ 64 ];
+  int upper = 0, lower = 0, pos;
 
   // Bail if the text is blank.
   if( ! chatText[0] )
      return;
+
+  for(pos = 0; chatText[pos]; pos++) {
+    if(chatText[pos] >= 'A' && chatText[pos] <= 'Z') upper++;
+    else if(chatText[pos] >= 'a' && chatText[pos] <= 'z') lower++;
+  }
+
+  if(upper > lower) {
+    for(pos = 0; chatText[pos]; pos++) {
+      if(chatText[pos] >= 'A' && chatText[pos] <= 'Z') chatText[pos] += 'a' - 'A';
+      else if(chatText[pos] >= 'a' && chatText[pos] <= 'z') chatText[pos] += 'A' - 'a';
+    }
+  }
 
   // Flood limit.  If they're talking too fast, determine that and return.
   if( g_floodMinTime.integer )
@@ -3379,6 +3392,8 @@ if( !ent->client->pers.override ) {
       G_GiveClientMaxAmmo( ent, buyingEnergyAmmo );
     else
     {
+      if( upgrade == UP_JETPACK )
+        ent->client->jetpackfuel = JETPACK_MAX_FUEL;
       //add to inventory
       BG_AddUpgradeToInventory( upgrade, ent->client->ps.stats );
     }

@@ -591,6 +591,21 @@ void ClientTimerActions( gentity_t *ent, int msec )
   else if( ent->client->ps.pm_flags & PMF_DUCKED )
     crouched = qtrue;
 
+  if( BG_InventoryContainsUpgrade( UP_JETPACK, client->ps.stats ) && BG_UpgradeIsActive( UP_JETPACK, client->ps.stats ) ) {
+    if( !client->jetpackWasActive ) {
+      client->jetpackWasActive = qtrue;
+      if( jumping ) {
+        if( client->jetpackfuel >= 20 ) {
+          vec3_t dir = {0, 0, 1};
+          G_Knockback( ent, dir, 500. );
+          client->jetpackfuel -= 20;
+        }
+      }
+    }
+  } else {
+    client->jetpackWasActive = qfalse;
+  }
+
   while ( client->time100 >= 100 )
   {
     client->time100 -= 100;
@@ -938,25 +953,36 @@ void ClientTimerActions( gentity_t *ent, int msec )
     }
     
     //my new jetpack code
-    if( g_fueledjetpack.integer == 1 ) {
+    if( g_fueledjetpack.integer ) {
       //if we have jetpack and its on
       if( BG_InventoryContainsUpgrade( UP_JETPACK, client->ps.stats ) && BG_UpgradeIsActive( UP_JETPACK, client->ps.stats ) ) {
         //check if fuels 0 if so deactivate it if not give a 10 second fuel low warning and take JETPACK_USE_RATE from fuel
         if( client->jetpackfuel <= 0.0f ) {
           BG_DeactivateUpgrade( UP_JETPACK, client->ps.stats ); 
-        } else if( client->jetpackfuel < 10.0f && client->jetpackfuel > 0.0f) {
-          client->jetpackfuel = client->jetpackfuel - JETPACK_USE_RATE;
-          trap_SendServerCommand( client - level.clients, "cp \"^3Fuel ^1Low!!!!!^7\nLand now.\"" );
+        //} else if( client->jetpackfuel < 10.0f && client->jetpackfuel > 0.0f) {
+        //  client->jetpackfuel = client->jetpackfuel - JETPACK_USE_RATE;
+        //  trap_SendServerCommand( client - level.clients, "cp \"^3Fuel ^1Low!!!!!^7\nLand now.\"" );
         } else {
           client->jetpackfuel = client->jetpackfuel - JETPACK_USE_RATE;
+          if(client->jetpackfuel <= 0) client->jetpackfuel = 0;
         }
         //if jetpack isnt active regenerate fuel and give a message when its full
+          trap_SendServerCommand( client - level.clients, va( "cp \"                                    ^3Fuel: %s%d%%\"",
+            ( client->jetpackfuel*100/JETPACK_MAX_FUEL > 20 ? "^2" : "^1" ),
+            (int)(client->jetpackfuel*100/JETPACK_MAX_FUEL)
+          ) );
       } else if( BG_InventoryContainsUpgrade( UP_JETPACK, client->ps.stats ) && !BG_UpgradeIsActive( UP_JETPACK, client->ps.stats ) ) {
-        if( client->jetpackfuel > ( JETPACK_MAX_FUEL - 10.0f ) && client->jetpackfuel <= JETPACK_MAX_FUEL  ) {
+        //if( client->jetpackfuel > ( JETPACK_MAX_FUEL - 10.0f ) && client->jetpackfuel <= JETPACK_MAX_FUEL  ) {
+        //  client->jetpackfuel = client->jetpackfuel + JETPACK_REGEN_RATE;
+        //  trap_SendServerCommand( client - level.clients, "cp \"^3Fuel Status:^2Full!!!!!^7\n\"" );
+        //} else
+        if( client->jetpackfuel < JETPACK_MAX_FUEL ) 
           client->jetpackfuel = client->jetpackfuel + JETPACK_REGEN_RATE;
-          trap_SendServerCommand( client - level.clients, "cp \"^3Fuel Status:^2Full!!!!!^7\n\"" );
-        } else if( client->jetpackfuel < JETPACK_MAX_FUEL ) 
-          client->jetpackfuel = client->jetpackfuel + JETPACK_REGEN_RATE;
+          if(client->jetpackfuel >= JETPACK_MAX_FUEL) client->jetpackfuel = JETPACK_MAX_FUEL;
+          trap_SendServerCommand( client - level.clients, va( "cp \"                                   ^3Fuel: %s%d%%\"",
+            ( client->jetpackfuel*100/JETPACK_MAX_FUEL > 20 ? "^2" : "^1" ),
+            (int)(client->jetpackfuel*100/JETPACK_MAX_FUEL)
+          ) );
       }
     }
   }
@@ -1635,8 +1661,8 @@ void ClientThink_real( gentity_t *ent )
     }
 
     //switch jetpack off if no reactor
-    if( !level.reactorPresent )
-      BG_DeactivateUpgrade( UP_JETPACK, client->ps.stats );
+    //if( !level.reactorPresent )
+    //  BG_DeactivateUpgrade( UP_JETPACK, client->ps.stats );
   }
 
   // set up for pmove

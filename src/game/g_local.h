@@ -526,6 +526,7 @@ struct gclient_s
   qboolean            charging;
   
   float               jetpackfuel;
+  qboolean            jetpackWasActive;
 
   vec3_t              hovelOrigin;          // player origin before entering hovel
 
