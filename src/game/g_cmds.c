@@ -4781,7 +4781,7 @@ void Cmd_Mods_f( gentity_t *ent )
   trap_SendServerCommand( ent - g_entities,
       va( "print \"Teamvote required for RC/OM decon: %i\n\"" , g_deconVote.integer ) );
   trap_SendServerCommand( ent - g_entities,
-      va( "print \"QVM Version: 4\n\"" , g_deconVote.integer ) );
+      va( "print \"QVM Version: 9\n\"" , g_deconVote.integer ) );
 }
 
 
