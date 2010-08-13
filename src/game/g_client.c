@@ -1634,7 +1634,7 @@ void ClientBegin( int clientNum )
   G_admin_recompute_votes_guid( ent->client->pers.guid );
 
 
-  if( g_extremeSuddenDeath.value )
+  if( g_suddenDeath.value )
     trap_SendServerCommand( client->ps.clientNum, va( "print \"^7Game is in Sudden Death\n\"" ) );
   if( g_extremeSuddenDeath.value )
     trap_SendServerCommand( client->ps.clientNum, va( "print \"^1Game is in Extreme Sudden Death\n\"" ) );
