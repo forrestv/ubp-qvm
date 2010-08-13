@@ -1029,18 +1029,6 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText )
   if( ! chatText[0] )
      return;
 
-  for(pos = 0; chatText[pos]; pos++) {
-    if(chatText[pos] >= 'A' && chatText[pos] <= 'Z') upper++;
-    else if(chatText[pos] >= 'a' && chatText[pos] <= 'z') lower++;
-  }
-
-  if(upper > lower) {
-    for(pos = 0; chatText[pos]; pos++) {
-      if(chatText[pos] >= 'A' && chatText[pos] <= 'Z') chatText[pos] += 'a' - 'A';
-      else if(chatText[pos] >= 'a' && chatText[pos] <= 'z') chatText[pos] += 'A' - 'a';
-    }
-  }
-
   // Flood limit.  If they're talking too fast, determine that and return.
   if( g_floodMinTime.integer )
     if ( G_Flood_Limited( ent ) )
@@ -1148,6 +1136,18 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText )
   }
 
   Com_sprintf( text, sizeof( text ), "%s^7", chatText );
+
+  for(pos = 0; text[pos]; pos++) {
+    if(text[pos] >= 'A' && text[pos] <= 'Z') upper++;
+    else if(text[pos] >= 'a' && text[pos] <= 'z') lower++;
+  }
+
+  if( upper > lower && upper > 2 && !G_admin_permission( ent, ADMF_ADMINCHAT ) ) {
+    for(pos = 0; text[pos]; pos++) {
+      if(text[pos] >= 'A' && text[pos] <= 'Z') text[pos] += 'a' - 'A';
+      else if(text[pos] >= 'a' && text[pos] <= 'z') text[pos] += 'A' - 'a';
+    }
+  }
 
   if( target )
   {
@@ -4781,7 +4781,7 @@ void Cmd_Mods_f( gentity_t *ent )
   trap_SendServerCommand( ent - g_entities,
       va( "print \"Teamvote required for RC/OM decon: %i\n\"" , g_deconVote.integer ) );
   trap_SendServerCommand( ent - g_entities,
-      va( "print \"QVM Version: 9\n\"" , g_deconVote.integer ) );
+      va( "print \"QVM Version: 10\n\"" , g_deconVote.integer ) );
 }
 
 
