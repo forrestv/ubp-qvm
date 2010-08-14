@@ -594,7 +594,7 @@ void ClientTimerActions( gentity_t *ent, int msec )
   if( BG_InventoryContainsUpgrade( UP_JETPACK, client->ps.stats ) && BG_UpgradeIsActive( UP_JETPACK, client->ps.stats ) ) {
     if( !client->jetpackWasActive ) {
       client->jetpackWasActive = qtrue;
-      if( jumping ) {
+      if( jumping && g_fueledjetpack.integer ) {
         if( client->jetpackfuel >= 20 ) {
           vec3_t dir = {0, 0, 1};
           G_Knockback( ent, dir, 500. );
