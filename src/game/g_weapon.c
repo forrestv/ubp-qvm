@@ -1518,7 +1518,7 @@ void FireWeapon3( gentity_t *ent )
   switch( ent->s.weapon )
   {
     case WP_ALEVEL2_UPG:
-      areaZapFire( ent, qtrue );
+      //areaZapFire( ent, qtrue );
       break;
     case WP_ALEVEL3_UPG:
       bounceBallFire( ent );
@@ -1567,7 +1567,7 @@ void FireWeapon2( gentity_t *ent )
       break;
 
     case WP_HBUILD2:
-      areaZapFire( ent, qtrue );
+      //areaZapFire( ent, qtrue );
     case WP_ABUILD:
     case WP_ABUILD2:
     case WP_HBUILD:
