@@ -826,17 +826,17 @@ void buildFire( gentity_t *ent, dynMenu_t menu )
       }
       else if( ent->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS && !G_IsOvermindBuilt( ) )
       {
-        ent->client->ps.stats[ STAT_MISC ] +=
+        ent->client->ps.stats[ STAT_MISC ] =
           BG_FindBuildDelayForWeapon( ent->s.weapon ) * 2;
       }
       else if( ent->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS && !G_IsPowered( muzzle ) &&
           ( ent->client->ps.stats[ STAT_BUILDABLE ] & ~SB_VALID_TOGGLEBIT ) != BA_H_REPEATER ) //hack
       {
-        ent->client->ps.stats[ STAT_MISC ] +=
+        ent->client->ps.stats[ STAT_MISC ] =
           BG_FindBuildDelayForWeapon( ent->s.weapon ) * 2;
       }
       else
-        ent->client->ps.stats[ STAT_MISC ] +=
+        ent->client->ps.stats[ STAT_MISC ] =
           BG_FindBuildDelayForWeapon( ent->s.weapon );
 
       ent->client->ps.stats[ STAT_BUILDABLE ] = BA_NONE;
