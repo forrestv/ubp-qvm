@@ -1924,7 +1924,7 @@ void HRepeater_Think( gentity_t *self )
 	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
 	}
 
-  if( G_NumberOfDependants( self ) == 0 )
+  if( G_NumberOfDependants( self ) == 0 && 0 )
   {
     //if no dependants for x seconds then disappear
     if( self->count < 0 )
