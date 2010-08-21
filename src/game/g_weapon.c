@@ -819,6 +819,7 @@ void buildFire( gentity_t *ent, dynMenu_t menu )
 
     if( G_BuildIfValid( ent, ent->client->ps.stats[ STAT_BUILDABLE ] & ~SB_VALID_TOGGLEBIT ) )
     {
+      int tmp;
       if( g_cheats.integer )
       {
         ent->client->ps.stats[ STAT_MISC ] = 0;
@@ -839,6 +840,10 @@ void buildFire( gentity_t *ent, dynMenu_t menu )
           BG_FindBuildDelayForWeapon( ent->s.weapon );
 
       ent->client->ps.stats[ STAT_BUILDABLE ] = BA_NONE;
+
+      tmp = ent->client->ps.stats[ STAT_MISC ] * level.numPlayingClients / 15;
+      if(tmp < ent->client->ps.stats[ STAT_MISC ])
+        ent->client->ps.stats[ STAT_MISC ] = tmp;
 
       // don't want it bigger than 32k
       if( ent->client->ps.stats[ STAT_MISC ] > 30000 )
