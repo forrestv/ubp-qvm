@@ -842,8 +842,12 @@ void buildFire( gentity_t *ent, dynMenu_t menu )
       ent->client->ps.stats[ STAT_BUILDABLE ] = BA_NONE;
 
       tmp = ent->client->ps.stats[ STAT_MISC ] * level.numPlayingClients / 15;
-      if(tmp < ent->client->ps.stats[ STAT_MISC ])
+      if(tmp < ent->client->ps.stats[ STAT_MISC ]) {
+        int tmp2 = ent->client->ps.stats[ STAT_MISC ];
         ent->client->ps.stats[ STAT_MISC ] = tmp;
+        if(ent->client->ps.stats[ STAT_MISC ] < tmp2/2)
+          ent->client->ps.stats[ STAT_MISC ] = tmp2/2;
+      }
 
       // don't want it bigger than 32k
       if( ent->client->ps.stats[ STAT_MISC ] > 30000 )
