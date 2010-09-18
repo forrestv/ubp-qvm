@@ -697,6 +697,11 @@ void ASpawn_Think( gentity_t *self )
 {
   gentity_t *ent;
 
+  if( level.extremeSuddenDeath )
+  {
+	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+	}
+
   if( self->spawned )
   {
     //only suicide if at rest
