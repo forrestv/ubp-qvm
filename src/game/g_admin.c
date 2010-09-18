@@ -1535,6 +1535,10 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                   c = exec[ exec_pos++ ];
                   find_name = 1;
               }
+              if( c == 'i' ) {
+                  c = exec[ exec_pos++ ];
+                  find_name = 2;
+              }
               if( c == '-' ) {
                   int cmd_item;
                   char *s;
@@ -1558,7 +1562,7 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                       gentity_t *vic = find_ent_by_name( ent, s );
                       if( !vic ) return qtrue;
                       if( !vic->client ) return qtrue;
-                      s = vic->client->pers.netname;
+                      s = find_name == 2 ? vic->client->pers.ip : vic->client->pers.netname;
                   }
                   
                   //newcmd[ newcmd_pos++ ] = '"';
@@ -1607,7 +1611,7 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
                       gentity_t *vic = find_ent_by_name( ent, s );
                       if( !vic ) return qtrue;
                       if( !vic->client ) return qtrue;
-                      strcpy( s, vic->client->pers.netname );
+                      strcpy( s,  find_name == 2 ? vic->client->pers.ip : vic->client->pers.netname );
                   }
                   //newcmd[ newcmd_pos++ ] = '"';
                   while( s[ s_pos ] ) {
@@ -7554,7 +7558,7 @@ qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
       }
     }
   } else {
-    if( vic->client->pers.teamSelection == PTE_HUMANS && g_alienStage.integer == 0 ) {
+    if( vic->client->pers.teamSelection == PTE_HUMANS && g_humanStage.integer == 0 ) {
         class = PCL_HUMAN;
         vic->client->pers.humanItemSelection = WP_HBUILD;
     } else if( vic->client->pers.teamSelection == PTE_HUMANS ) {
@@ -7771,14 +7775,14 @@ qboolean G_admin_applist( gentity_t *ent, int skiparg )
   apps_count = 0;
   for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
   {
-    int self_yes;
+    int votes_yes;
     
     if( !G_admin_permission_admin( g_admin_admins[ i ], "applicable" ) )
       continue;
     
-    G_admin_count_votes( g_admin_admins[ i ], &self_yes, NULL, NULL, NULL, NULL, NULL );
+    G_admin_count_votes( g_admin_admins[ i ], NULL, &votes_yes, NULL, NULL, NULL, NULL );
     
-    if( !self_yes )
+    if( !votes_yes )
       continue;
     
     apps[ apps_count ].index = i;
@@ -7941,7 +7945,7 @@ qboolean G_admin_appvote( gentity_t *ent, int skiparg )
     }
 
     G_admin_count_votes( admin, &self_yes, NULL, NULL, NULL, NULL, NULL );
-    if( !self_yes && admin_index != my_index )
+    if( !self_yes && admin_index != my_index && 0 )
     {
       ADMP( va( "^3!appvote: ^7^7%i (%s^7) - hasn't applied\n", admin_index, admin->name ) );
       continue;
