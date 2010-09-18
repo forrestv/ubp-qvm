@@ -884,7 +884,7 @@ void Cmd_Team_f( gentity_t *ent )
       trap_SendServerCommand( ent-g_entities, va( "print \"You cannot join teams\n\"" ) );
       return; 
     }
-    if( level.humanTeamLocked && level.alienTeamLocked )
+    if( ( level.humanTeamLocked || level.humanTeamAutoLocked ) && ( level.alienTeamLocked || level.alienTeamAutoLocked ) )
       team = PTE_NONE;
     else if( humans > aliens )
       team = PTE_ALIENS;
@@ -893,9 +893,9 @@ void Cmd_Team_f( gentity_t *ent )
     else
       team = PTE_ALIENS + ( rand( ) % 2 );
 
-    if( team == PTE_ALIENS && level.alienTeamLocked )
+    if( team == PTE_ALIENS && ( level.alienTeamLocked || level.alienTeamAutoLocked ) )
       team = PTE_HUMANS;
-    else if( team == PTE_HUMANS && level.humanTeamLocked )
+    else if( team == PTE_HUMANS && ( level.humanTeamLocked || level.humanTeamAutoLocked ) )
       team = PTE_ALIENS;
   }
   else
