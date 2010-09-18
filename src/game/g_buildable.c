@@ -1687,7 +1687,7 @@ void ABooster_Touch( gentity_t *self, gentity_t *other, trace_t *trace )
 
 void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 {
-  return;
+  //return;
   if( self->health <= 0 )
     return;
 
