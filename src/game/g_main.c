@@ -98,7 +98,6 @@ vmCvar_t  g_suddenDeathVotePercent;
 vmCvar_t  g_suddenDeathVoteDelay;
 vmCvar_t  g_extremeSuddenDeathVotePercent;
 vmCvar_t  g_extremeSuddenDeathVoteDelay;
-vmCvar_t  g_extremeSuddenDeathAutoSpec;
 vmCvar_t  g_mapVotesPercent;
 vmCvar_t  g_designateVotes;
 vmCvar_t  g_teamAutoJoin;
@@ -310,7 +309,6 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_suddenDeathVoteDelay, "g_suddenDeathVoteDelay", "180", CVAR_ARCHIVE, 0, qfalse },
   { &g_extremeSuddenDeathVotePercent, "g_extremeSuddenDeathVotePercent", "75", CVAR_ARCHIVE, 0, qfalse },
   { &g_extremeSuddenDeathVoteDelay, "g_extremeSuddenDeathVoteDelay", "30", CVAR_ARCHIVE, 0, qfalse },
-  { &g_extremeSuddenDeathAutoSpec, "g_extremeSuddenDeathAutoSpec", "1", CVAR_ARCHIVE, 0, qfalse },
   { &g_mapVotesPercent, "g_mapVotesPercent", "50", CVAR_ARCHIVE, 0, qfalse },
   { &g_designateVotes, "g_designateVotes", "0", CVAR_ARCHIVE, 0, qfalse },
   { &g_freeCredits, "g_freeCredits", "0", CVAR_ARCHIVE, 0, qfalse  },

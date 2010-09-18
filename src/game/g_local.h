@@ -1322,7 +1322,6 @@ extern  vmCvar_t  g_suddenDeathVotePercent;
 extern  vmCvar_t  g_suddenDeathVoteDelay;
 extern  vmCvar_t  g_extremeSuddenDeathVotePercent;
 extern  vmCvar_t  g_extremeSuddenDeathVoteDelay;
-extern  vmCvar_t  g_extremeSuddenDeathAutoSpec;
 extern  vmCvar_t  g_mapVotesPercent;
 extern  vmCvar_t  g_designateVotes;
 extern  vmCvar_t  g_teamAutoJoin;
