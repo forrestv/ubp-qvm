@@ -981,8 +981,8 @@ finish_dying: // from MOD_SLAP
 
   trap_LinkEntity( self );
   
-  //if( level.extremeSuddenDeath && g_extremeSuddenDeathAutoSpec.integer )
-  //  G_ChangeTeam( self, PTE_NONE );
+  if( level.extremeSuddenDeath && g_extremeSuddenDeathAutoSpec.integer )
+    G_ChangeTeam( self, PTE_NONE );
 }
 
 
