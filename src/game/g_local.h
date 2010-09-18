@@ -1439,6 +1439,12 @@ extern  vmCvar_t  g_vampireDeathInfo;
 
 extern  vmCvar_t  g_fueledjetpack;
 
+extern  vmCvar_t  g_keepSpawn;
+extern  vmCvar_t  g_keepSpawnX;
+extern  vmCvar_t  g_keepSpawnY;
+extern  vmCvar_t  g_keepSpawnZ;
+extern  vmCvar_t  g_keepSpawnA;
+
 void      trap_Printf( const char *fmt );
 void      trap_Error( const char *fmt );
 int       trap_Milliseconds( void );

@@ -215,6 +215,12 @@ vmCvar_t  g_epicSuddenDeathVotePercent;
 
 vmCvar_t  g_fueledjetpack;
 
+vmCvar_t  g_keepSpawn;
+vmCvar_t  g_keepSpawnX;
+vmCvar_t  g_keepSpawnY;
+vmCvar_t  g_keepSpawnZ;
+vmCvar_t  g_keepSpawnA;
+
 static cvarTable_t   gameCvarTable[ ] =
 {
   // don't override the cheat state set by the system
@@ -412,6 +418,12 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_deconVote, "g_deconVote", "1", 0, 0, qtrue  },
   { &g_epicSuddenDeath, "g_epicSuddenDeath", "0", 0, 0, qtrue  },
   { &g_epicSuddenDeathVotePercent, "g_epicSuddenDeathVotePercent", "74", 0, 0, qtrue  },
+
+  { &g_keepSpawn, "g_keepSpawn", "0", 0, 0, qfalse },
+  { &g_keepSpawnX, "g_keepSpawnX", "0", 0, 0, qfalse },
+  { &g_keepSpawnY, "g_keepSpawnY", "0", 0, 0, qfalse },
+  { &g_keepSpawnZ, "g_keepSpawnZ", "0", 0, 0, qfalse },
+  { &g_keepSpawnA, "g_keepSpawnA", "0", 0, 0, qfalse },
 };
 
 static int gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[ 0 ] );
