@@ -1693,6 +1693,9 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 
   if( !self->spawned )
     return;
+  
+  if( self->s.modelindex == BA_A_BOOSTER  && !G_FindOvermind( self ) ) return;
+  if( self->s.modelindex == BA_H_MEDISTAT && !G_FindPower( self )    ) return;
 
   if( other ) {
     int cost = 1;
