@@ -820,13 +820,13 @@ void Cmd_Team_f( gentity_t *ent )
       return;
     }
 
-    if( level.alienTeamLocked && !force )
+    if( ( level.alienTeamLocked || level.alienTeamAutoLocked ) && !force )
     {
       trap_SendServerCommand( ent-g_entities,
         va( "print \"Alien team has been ^1LOCKED\n\"" ) );
       return; 
     }
-    else if( level.humanTeamLocked )
+    else if( level.humanTeamLocked || level.humanTeamAutoLocked )
     {
       // if only one team has been locked, let people join the other
       // regardless of balance
@@ -856,13 +856,13 @@ void Cmd_Team_f( gentity_t *ent )
       return;
     }
 
-    if( level.humanTeamLocked && !force )
+    if( ( level.humanTeamLocked || level.humanTeamAutoLocked ) && !force )
     {
       trap_SendServerCommand( ent-g_entities,
         va( "print \"Human team has been ^1LOCKED\n\"" ) );
       return; 
     }
-    else if( level.alienTeamLocked )
+    else if( level.alienTeamLocked || level.alienTeamAutoLocked )
     {
       // if only one team has been locked, let people join the other
       // regardless of balance

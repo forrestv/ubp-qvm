@@ -771,6 +771,8 @@ typedef struct
   qboolean          uncondHumanWin;
   qboolean          alienTeamLocked;
   qboolean          humanTeamLocked;
+  qboolean          alienTeamAutoLocked;
+  qboolean          humanTeamAutoLocked;
   qboolean          paused;
   int               pauseTime;
   float             pause_speed;

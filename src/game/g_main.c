@@ -1441,18 +1441,13 @@ if( !level.extremeSuddenDeath )
 		if( level.extremeSuddenDeathWarning < TW_PASSED )
 		{
 		trap_SendServerCommand( -1, "cp \"^1EXTREME SUDDEN DEATH! NO SPAWNS! NO BUILDING!\"" );
+		AP( va( "print \"^1EXTREME SUDDEN DEATH! NO SPAWNS! NO BUILDING!\n\"") );
 		G_LogPrintf("Beginning Extreme Sudden Death\n");
-		level.alienTeamLocked=qtrue;
-		level.humanTeamLocked=qtrue;
-		AP( va( "print \"^3!lock: ^7Human team has been locked by console\n\"") );
-		AP( va( "print \"^3!lock: ^7Alien team has been locked by console\n\"") );
 	    localHTP = 0;
 		localATP = 0;
 		level.suddenDeathHBuildPoints = localHTP;
         level.suddenDeathABuildPoints = localATP;
 		
-        trap_SendConsoleCommand( EXEC_NOW, "alienWin\n" );
-        trap_SendConsoleCommand( EXEC_NOW, "humanWin\n" );
         if( g_alienStage.integer < 2 )
            trap_SendConsoleCommand( EXEC_NOW, "g_alienStage 2\n" );
         if( g_humanStage.integer < 2 )
@@ -1749,6 +1744,63 @@ void G_CalculateAvgPlayers( void )
       + level.numHumanClients ) /
     (float)( level.numHumanSamples + 1 );
   level.numHumanSamples++;
+}
+
+void G_PlayerFlow( void ) {
+  qboolean alienSpawnPresent = qfalse, alienBuilderPresent = qfalse;
+  qboolean humanSpawnPresent = qfalse, humanBuilderPresent = qfalse, humanPlayerPresent = qfalse, humanArmouryPresent = qfalse;
+  int i;
+  gentity_t *ent;
+  qboolean newAlienTeamAutoLocked, newHumanTeamAutoLocked;
+
+  for( i = 0, ent = g_entities + i ; i < level.num_entities ; i++, ent++ ) {
+    if( !ent->inuse ) continue;
+    if( ent->health <= 0 ) continue;
+
+    if( ent->client && ent->client->pers.connected == CON_CONNECTED ) {
+      if( ent->client->sess.sessionTeam == TEAM_SPECTATOR ) continue; // dead
+      if( ent->client->pers.teamSelection == PTE_ALIENS ) {
+        if( ent->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0 || ent->client->ps.stats[ STAT_PCLASS ] == PCL_ALIEN_BUILDER0_UPG ) alienBuilderPresent = qtrue;
+      } else if( ent->client->pers.teamSelection == PTE_HUMANS ) {
+        humanPlayerPresent = qtrue;
+        if( BG_InventoryContainsWeapon( WP_HBUILD, ent->client->ps.stats ) || BG_InventoryContainsWeapon( WP_HBUILD2, ent->client->ps.stats ) ) humanBuilderPresent = qtrue;
+      }
+    } else if( ent->s.eType == ET_BUILDABLE ) {
+      if( ent->s.modelindex == BA_A_SPAWN ) alienSpawnPresent = qtrue;
+      if( ent->s.modelindex == BA_H_SPAWN ) humanSpawnPresent = qtrue;
+      if( ent->s.modelindex == BA_H_ARMOURY ) humanArmouryPresent = qtrue;
+    }
+  }
+
+  newAlienTeamAutoLocked = !(alienSpawnPresent || alienBuilderPresent);
+  newHumanTeamAutoLocked = !(humanSpawnPresent || humanBuilderPresent || (humanPlayerPresent && humanArmouryPresent));
+
+  if( level.extremeSuddenDeath ) {
+    newAlienTeamAutoLocked = qtrue;
+    newHumanTeamAutoLocked = qtrue;
+  }
+
+  if( newAlienTeamAutoLocked && !level.alienTeamAutoLocked ) AP( va( "print \"^1Alien team has been auto-locked\n\"") );
+  if( !newAlienTeamAutoLocked && level.alienTeamAutoLocked ) AP( va( "print \"^1Alien team has been auto-unlocked\n\"") );
+  if( newHumanTeamAutoLocked && !level.humanTeamAutoLocked ) AP( va( "print \"^1Human team has been auto-locked\n\"") );
+  if( !newHumanTeamAutoLocked && level.humanTeamAutoLocked ) AP( va( "print \"^1Human team has been auto-unlocked\n\"") );
+
+  level.alienTeamAutoLocked = newAlienTeamAutoLocked;
+  level.humanTeamAutoLocked = newHumanTeamAutoLocked;
+  
+  for( i = 0, ent = g_entities + i ; i < level.num_entities ; i++, ent++ ) {
+    if( !ent->inuse ) continue;
+    if( ent->health <= 0 ) continue;
+
+    if( ent->client && ent->client->pers.connected == CON_CONNECTED ) {
+      if( ent->client->sess.sessionTeam != TEAM_SPECTATOR ) continue;
+      if( ent->client->pers.teamSelection == PTE_ALIENS ) {
+        if( level.alienTeamAutoLocked ) G_ChangeTeam( ent, PTE_NONE );
+      } else if( ent->client->pers.teamSelection == PTE_HUMANS ) {
+        if( level.humanTeamAutoLocked ) G_ChangeTeam( ent, PTE_NONE );
+      }
+    }
+  }
 }
 
 /*
@@ -3284,6 +3336,7 @@ void G_RunFrame( int levelTime )
   G_SpawnClients( PTE_HUMANS );
   G_CalculateAvgPlayers( );
   G_UpdateZaps( msec );
+  G_PlayerFlow( );
 
   // see if it is time to end the level
   CheckExitRules( );
