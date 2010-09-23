@@ -1268,6 +1268,10 @@ static void Cmd_Say_f( gentity_t *ent )
     mode = SAY_TEAM;
   if( Q_stricmpn( args, "say_admins ", 11 ) == 0 || Q_stricmpn( args, "a ", 2 ) == 0)
     mode = SAY_ADMINS;
+  if( Q_stricmpn( args, "b ", 2 ) == 0 ) {
+    mode = SAY_ADMINS;
+    ent = NULL;
+  }
 
   // support parsing /m out of say text since some people have a hard
   // time figuring out what the console is.
@@ -1288,6 +1292,13 @@ static void Cmd_Say_f( gentity_t *ent )
    {
        mode = SAY_ADMINS;
        skipargs=1;
+   }
+   if( !Q_stricmpn( args, "say /b ", 7) ||
+       !Q_stricmpn( args, "say_team /b ", 12) )
+   {
+       mode = SAY_ADMINS;
+       skipargs=1;
+       ent = NULL;
    }
    
    if( mode == SAY_ADMINS)  
@@ -4802,6 +4813,7 @@ commands_t cmds[ ] = {
   { "say_team", CMD_MESSAGE|CMD_INTERMISSION, Cmd_Say_f },
   { "say_admins", CMD_MESSAGE|CMD_INTERMISSION, Cmd_Say_f },
   { "a", CMD_MESSAGE|CMD_INTERMISSION, Cmd_Say_f },
+  { "b", CMD_MESSAGE|CMD_INTERMISSION, Cmd_Say_f },
   { "m", CMD_MESSAGE|CMD_INTERMISSION, G_PrivateMessage },
   { "mt", CMD_MESSAGE|CMD_INTERMISSION, G_PrivateMessage },
   { "me", CMD_MESSAGE|CMD_INTERMISSION, Cmd_Say_f },
