@@ -1637,7 +1637,7 @@ void ClientBegin( int clientNum )
   if( g_suddenDeath.value )
     trap_SendServerCommand( client->ps.clientNum, va( "print \"^7Game is in Sudden Death\n\"" ) );
   if( g_extremeSuddenDeath.value )
-    trap_SendServerCommand( client->ps.clientNum, va( "print \"^1Game is in Extreme Sudden Death\n\"" ) );
+    trap_SendServerCommand( client->ps.clientNum, va( "print \"^1Game is in Extreme Sudden Death - try right clicking!\n\"" ) );
   if( g_epicSuddenDeath.value )
     trap_SendServerCommand( client->ps.clientNum, va( "print \"^2Game is in Epic Sudden Death\n\"" ) );
   if( g_vampireDeath.value )

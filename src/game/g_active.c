@@ -380,7 +380,7 @@ void SpectatorThink( gentity_t *ent, usercmd_t *ucmd )
 {
   pmove_t pm;
   gclient_t *client;
-  qboolean attack1, attack3;
+  qboolean attack1, attack2, attack3;
   qboolean  doPmove = qtrue;
 
   client = ent->client;
@@ -390,6 +390,8 @@ void SpectatorThink( gentity_t *ent, usercmd_t *ucmd )
 
    attack1 = ( ( client->buttons & BUTTON_ATTACK ) &&
                !( client->oldbuttons & BUTTON_ATTACK ) );
+   attack2 = ( ( client->buttons & BUTTON_ATTACK2 ) &&
+               !( client->oldbuttons & BUTTON_ATTACK2 ) );
    attack3 = ( ( client->buttons & BUTTON_USE_HOLDABLE ) &&
                !( client->oldbuttons & BUTTON_USE_HOLDABLE ) );
 
@@ -494,7 +496,37 @@ void SpectatorThink( gentity_t *ent, usercmd_t *ucmd )
     else if( client->pers.teamSelection == PTE_HUMANS )
       G_TriggerMenu( ent-g_entities, MN_H_SPAWN );
   }
-   
+  
+  if( client->ps.stats[ STAT_PTEAM ] == PTE_NONE && attack2 ) {
+    if( !( ( level.humanTeamLocked || level.humanTeamAutoLocked ) && ( level.alienTeamLocked || level.alienTeamAutoLocked ) ) ) {
+      trap_SendServerCommand( ent - g_entities, va( "cp \"You can play, why would you want to spectate?\nJoin a team!\n\"") );
+    } else if( !g_keepSpawn.integer ) {
+      trap_SendServerCommand( ent - g_entities, va( "cp \"Spawning position not set for this map.\nIf you bother the admins, maybe they'll set it!\n\"") );
+    } else {
+      vec3_t pos, mins, maxs;
+      vec3_t angles = { 0, 0, 0 };
+      trace_t tr;
+      pos[0] = g_keepSpawnX.value;
+      pos[1] = g_keepSpawnY.value;
+      pos[2] = g_keepSpawnZ.value;
+      angles[1] = g_keepSpawnA.value;
+      ent->client->pers.classSelection = g_keepSpawnUpg.integer ? PCL_ALIEN_BUILDER0_UPG : PCL_ALIEN_BUILDER0;
+      BG_FindBBoxForClass( ent->client->pers.classSelection, mins, maxs, NULL, NULL, NULL );
+      trap_Trace( &tr, pos, mins, maxs, pos, -1, MASK_PLAYERSOLID );
+      if( tr.entityNum != ENTITYNUM_NONE ) {
+        trap_SendServerCommand( ent - g_entities, va( "cp \"Spawning position blocked.\nTry again soon!\n\"") );
+      } else {
+        ent->client->sess.sessionTeam = TEAM_FREE;
+        ClientUserinfoChanged( ent - g_entities, qtrue );
+        ent->client->pers.evolveHealthFraction = 1.;
+        VectorCopy( pos, ent->s.pos.trBase );
+        ClientSpawn( ent, ent, pos, angles );
+        ClientUserinfoChanged( ent - g_entities, qtrue );
+        trap_SendServerCommand( ent - g_entities, va( "cp \"Type /kill to spectate\n\"") );
+      }
+    }
+  }
+ 
   if( attack3 )
   {
    G_ToggleFollow( ent );
@@ -604,6 +636,21 @@ void ClientTimerActions( gentity_t *ent, int msec )
     }
   } else {
     client->jetpackWasActive = qfalse;
+  }
+
+  if( client->ps.weapon == WP_ALEVEL0 && ucmd->buttons & BUTTON_ATTACK2 && g_dretchExplode.value > 0. )
+  {
+    gentity_t *tent;
+    int damage;
+    tent = G_TempEntity( ent->s.origin, EV_HUMAN_BUILDABLE_EXPLOSION );
+    damage = BG_FindHealthForClass( ent->client->ps.stats[ STAT_PCLASS ] );
+    ent->health -= damage;
+    ent->client->ps.stats[ STAT_HEALTH ] = ent->health;
+    ent->lastDamageTime = level.time;
+    ent->enemy = ent;
+    ent->die( ent, ent, ent, damage, MOD_EXPLODE );
+    G_RadiusDamage( ent->r.currentOrigin, ent, g_dretchExplode.value,
+                    g_dretchExplodeRange.value, ent, MOD_EXPLODE_SPLASH );
   }
 
   while ( client->time100 >= 100 )
@@ -1859,7 +1906,7 @@ void ClientThink_real( gentity_t *ent )
 
         if( i == num && client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS )
         {
-          if( BG_UpgradeClassAvailable( &client->ps ) )
+          if( BG_UpgradeClassAvailable( &client->ps ) || ent->client->pers.override )
           {
             //no nearby objects and alien - show class menu
             G_TriggerMenu( ent->client->ps.clientNum, MN_A_INFEST );

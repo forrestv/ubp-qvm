@@ -1444,6 +1444,10 @@ extern  vmCvar_t  g_keepSpawnX;
 extern  vmCvar_t  g_keepSpawnY;
 extern  vmCvar_t  g_keepSpawnZ;
 extern  vmCvar_t  g_keepSpawnA;
+extern  vmCvar_t  g_keepSpawnUpg;
+
+extern  vmCvar_t  g_dretchExplode;
+extern  vmCvar_t  g_dretchExplodeRange;
 
 void      trap_Printf( const char *fmt );
 void      trap_Error( const char *fmt );

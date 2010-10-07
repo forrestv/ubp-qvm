@@ -507,7 +507,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
     // do not send obituary or credit any kills by slapping, skip straight to
     // setting the animations etc
-    goto finish_dying;
+    //goto finish_dying;
   }
   if( meansOfDeath == MOD_EXPLODE_SPLASH )
   {
@@ -517,7 +517,7 @@ void player_die( gentity_t *self, gentity_t *inflictor, gentity_t *attacker, int
 
     // do not send obituary or credit any kills by slapping, skip straight to
     // setting the animations etc
-    goto finish_dying;
+    //goto finish_dying;
   }
 
   // broadcast the death event to everyone
@@ -1854,7 +1854,7 @@ void G_Damage( gentity_t *targ, gentity_t *inflictor, gentity_t *attacker,
 
         take = 0 - take;
       }
-      else
+      else if( targ->client->pers.teamSelection != PTE_NONE )
       {
         attacker->health += takeNoOverkill;
         attacker->client->ps.stats[ STAT_HEALTH ] = attacker->health;

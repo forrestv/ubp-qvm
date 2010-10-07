@@ -220,6 +220,10 @@ vmCvar_t  g_keepSpawnX;
 vmCvar_t  g_keepSpawnY;
 vmCvar_t  g_keepSpawnZ;
 vmCvar_t  g_keepSpawnA;
+vmCvar_t  g_keepSpawnUpg;
+
+vmCvar_t  g_dretchExplode;
+vmCvar_t  g_dretchExplodeRange;
 
 static cvarTable_t   gameCvarTable[ ] =
 {
@@ -424,6 +428,10 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_keepSpawnY, "g_keepSpawnY", "0", 0, 0, qfalse },
   { &g_keepSpawnZ, "g_keepSpawnZ", "0", 0, 0, qfalse },
   { &g_keepSpawnA, "g_keepSpawnA", "0", 0, 0, qfalse },
+  { &g_keepSpawnUpg, "g_keepSpawnUpg", "0", 0, 0, qfalse },
+
+  { &g_dretchExplode, "g_dretchExplode", "0", 0, 0, qfalse },
+  { &g_dretchExplodeRange, "g_dretchExplodeRange", "0", 0, 0, qfalse },
 };
 
 static int gameCvarTableSize = sizeof( gameCvarTable ) / sizeof( gameCvarTable[ 0 ] );
@@ -1464,6 +1472,8 @@ if( !level.extremeSuddenDeath )
            trap_SendConsoleCommand( EXEC_NOW, "g_alienStage 2\n" );
         if( g_humanStage.integer < 2 )
            trap_SendConsoleCommand( EXEC_NOW, "g_humanStage 2\n" );
+        trap_SendConsoleCommand( EXEC_NOW, "alienWin\n" );
+        trap_SendConsoleCommand( EXEC_NOW, "humanWin\n" );
         for( i = 0; i < MAX_CLIENTS; i++ ) {
            level.clients[i].ps.persistant[PERS_CREDIT] = 2000;
 	   level.clients[i].ps.persistant[ PERS_SCORE ] = 0;
@@ -1796,6 +1806,7 @@ void G_PlayerFlow( void ) {
   if( !newAlienTeamAutoLocked && level.alienTeamAutoLocked ) AP( va( "print \"^1Alien team has been auto-unlocked\n\"") );
   if( newHumanTeamAutoLocked && !level.humanTeamAutoLocked ) AP( va( "print \"^1Human team has been auto-locked\n\"") );
   if( !newHumanTeamAutoLocked && level.humanTeamAutoLocked ) AP( va( "print \"^1Human team has been auto-unlocked\n\"") );
+  if( ( newAlienTeamAutoLocked && newHumanTeamAutoLocked ) && !( level.alienTeamAutoLocked && level.humanTeamAutoLocked ) && g_keepSpawn.integer ) AP( va( "print \"^7Both team have been auto-locked - spectators can right click to spawn now\n\"") );
 
   level.alienTeamAutoLocked = newAlienTeamAutoLocked;
   level.humanTeamAutoLocked = newHumanTeamAutoLocked;
@@ -1803,13 +1814,14 @@ void G_PlayerFlow( void ) {
   for( i = 0, ent = g_entities + i ; i < level.num_entities ; i++, ent++ ) {
     if( !ent->inuse ) continue;
     if( ent->health <= 0 ) continue;
-
-    if( ent->client && ent->client->pers.connected == CON_CONNECTED ) {
-      if( ent->client->sess.sessionTeam != TEAM_SPECTATOR ) continue;
-      if( ent->client->pers.teamSelection == PTE_ALIENS ) {
-        if( level.alienTeamAutoLocked ) G_ChangeTeam( ent, PTE_NONE );
-      } else if( ent->client->pers.teamSelection == PTE_HUMANS ) {
-        if( level.humanTeamAutoLocked ) G_ChangeTeam( ent, PTE_NONE );
+    if( ent->client && ent->client->pers.connected != CON_CONNECTED ) continue;
+    if( ent->client->sess.sessionTeam != TEAM_SPECTATOR ) continue;
+    if( ( ent->client->pers.teamSelection == PTE_ALIENS && level.alienTeamAutoLocked) || ( ent->client->pers.teamSelection == PTE_HUMANS && level.humanTeamAutoLocked) ) {
+      G_ChangeTeam( ent, PTE_NONE );
+      if( ( level.humanTeamLocked || level.humanTeamAutoLocked ) && ( level.alienTeamLocked || level.alienTeamAutoLocked ) ) {
+        trap_SendServerCommand( ent - g_entities, va( "cp \"Right click to spawn as a spec-granger!\n\"") );
+      } else {
+        trap_SendServerCommand( ent - g_entities, va( "cp \"Feel free to join the other team.\n\"") );
       }
     }
   }
@@ -2899,6 +2911,8 @@ void CheckCountdown( void )
 {
   static int lastmsg = 0;
   int timeleft = g_warmup.integer - ( level.time - level.startTime ) / 1000;
+  qtime_t qt;
+  int t;
 
   if( !g_doWarmup.integer || timeleft < 0 )
     return;
@@ -2906,7 +2920,16 @@ void CheckCountdown( void )
   if( level.time - lastmsg < 1000 )
     return;
 
+  t = trap_RealTime( &qt );
+
   lastmsg = level.time;
+  if( qt.tm_mon + 1 == 9 && qt.tm_mday == 19 ) {
+    if( timeleft > 0 )
+      trap_SendServerCommand( -1, va( "cp \"^1Avast!^7\n^%i----- ^7%i sec's to firin' range!^%i-----\"", timeleft % 7, timeleft, timeleft % 7 ) );
+    else if( timeleft == 0 ) 
+      trap_SendServerCommand( -1, "cp \"^2----- HEAVE HO! -----^7\"" );
+    return;
+  }
   if( timeleft > 0 )
     trap_SendServerCommand( -1, va( "cp \"^1Warmup Time:^7\n^%i----- ^7%i ^%i-----\"", timeleft % 7, timeleft, timeleft % 7 ) );
   else if( timeleft == 0 ) 
