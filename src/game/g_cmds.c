@@ -4849,7 +4849,7 @@ commands_t cmds[ ] = {
 
   { "where", CMD_TEAM, Cmd_Where_f },
   { "teamvote", CMD_TEAM, Cmd_TeamVote_f },
-  { "class", CMD_TEAM, Cmd_Class_f },
+  { "class", 0, Cmd_Class_f },
 
   { "build", CMD_TEAM|CMD_LIVING, Cmd_Build_f },
   { "deconstruct", 0, Cmd_Destroy_f },

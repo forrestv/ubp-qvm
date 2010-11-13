@@ -422,7 +422,7 @@ g_admin_level_t *g_admin_levels[ MAX_ADMIN_LEVELS ];
 g_admin_admin_t *g_admin_admins[ MAX_ADMIN_ADMINS ];
 g_admin_ban_t *g_admin_bans[ MAX_ADMIN_BANS ];
 g_admin_command_t *g_admin_commands[ MAX_ADMIN_COMMANDS ];
-g_admin_namelog_t *g_admin_namelog[ MAX_ADMIN_NAMELOGS ];
+g_admin_namelog_t *g_admin_namelog[ MAX_ADMIN_NAMELOGS + 1 ];
 
 // match a certain flag within these flags
 // return state of whether flag was found or not, 
@@ -1386,6 +1386,10 @@ qboolean G_admin_ban_check( char *userinfo, char *reason, int rlen )
       if( intIP == tempIP || mask == 0 )
       {
         G_LogPrintf("Banned player tried to connect from IP %s\n", ip);
+        if( strcmp( g_admin_bans[i]->name, "<UNKNOWN>" ) == 0 ) {
+          Q_strncpyz( g_admin_bans[i]->name, Info_ValueForKey( userinfo, "name" ), sizeof( g_admin_bans[i]->name ) );
+          admin_writeconfig();
+        }
         banned = qtrue;
       }
     }
@@ -2940,12 +2944,30 @@ qboolean G_admin_ban( gentity_t *ent, int skiparg )
       }
     }
   }
-  
+ 
+  if( !logmatches && s2[0] >= '0' && s2[0] <= '9' && strstr( s2, "." ) ) {
+  g_admin_namelog_t *namelog;
+  logmatch = MAX_ADMIN_NAMELOGS;
+  namelog = g_admin_namelog[ logmatch ];
+  if( !namelog ) {
+    namelog = G_Alloc( sizeof( g_admin_namelog_t ) );
+    g_admin_namelog[ logmatch ] = namelog;
+  }
+  memset( namelog, 0, sizeof( namelog ) );
+  for( j = 0; j < MAX_ADMIN_NAMELOG_NAMES ; j++ )
+    namelog->name[ j ][ 0 ] = '\0';
+  Q_strncpyz( namelog->ip, s2, sizeof( namelog->ip ) );
+  Q_strncpyz( namelog->guid, "", sizeof( namelog->guid ) );
+  Q_strncpyz( namelog->name[ 0 ], "<UNKNOWN>",
+    sizeof( namelog->name[ 0 ] ) );
+  namelog->slot = -1;
+  logmatches = 1;
+  } 
   if( !logmatches ) 
   {
     ADMP( "^3!ban: ^7no player found by that name, IP, or slot number\n" );
     return qfalse;
-  } 
+  }
   else if( logmatches > 1 )
   {
     ADMBP_begin();
@@ -3479,7 +3501,7 @@ void G_admin_adminlog_cleanup( void )
 {
   int i;
 
-  for( i = 0; i < MAX_ADMIN_ADMINLOGS && g_admin_adminlog[ i ]; i++ )
+  for( i = 0; i < MAX_ADMIN_ADMINLOGS + 1 && g_admin_adminlog[ i ]; i++ )
   {
     G_Free( g_admin_adminlog[ i ] );
     g_admin_adminlog[ i ] = NULL;

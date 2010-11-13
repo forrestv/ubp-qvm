@@ -1463,17 +1463,17 @@ if( !level.extremeSuddenDeath )
 		trap_SendServerCommand( -1, "cp \"^1EXTREME SUDDEN DEATH! NO SPAWNS! NO BUILDING!\"" );
 		AP( va( "print \"^1EXTREME SUDDEN DEATH! NO SPAWNS! NO BUILDING!\n\"") );
 		G_LogPrintf("Beginning Extreme Sudden Death\n");
-	    localHTP = 0;
-		localATP = 0;
-		level.suddenDeathHBuildPoints = localHTP;
-        level.suddenDeathABuildPoints = localATP;
+	    //localHTP = 0;
+		//localATP = 0;
+		//level.suddenDeathHBuildPoints = localHTP;
+        //level.suddenDeathABuildPoints = localATP;
 		
         if( g_alienStage.integer < 2 )
            trap_SendConsoleCommand( EXEC_NOW, "g_alienStage 2\n" );
         if( g_humanStage.integer < 2 )
            trap_SendConsoleCommand( EXEC_NOW, "g_humanStage 2\n" );
-        trap_SendConsoleCommand( EXEC_NOW, "alienWin\n" );
-        trap_SendConsoleCommand( EXEC_NOW, "humanWin\n" );
+        //trap_SendConsoleCommand( EXEC_NOW, "alienWin\n" );
+        //trap_SendConsoleCommand( EXEC_NOW, "humanWin\n" );
         for( i = 0; i < MAX_CLIENTS; i++ ) {
            level.clients[i].ps.persistant[PERS_CREDIT] = 2000;
 	   level.clients[i].ps.persistant[ PERS_SCORE ] = 0;
@@ -1819,7 +1819,8 @@ void G_PlayerFlow( void ) {
     if( ( ent->client->pers.teamSelection == PTE_ALIENS && level.alienTeamAutoLocked) || ( ent->client->pers.teamSelection == PTE_HUMANS && level.humanTeamAutoLocked) ) {
       G_ChangeTeam( ent, PTE_NONE );
       if( ( level.humanTeamLocked || level.humanTeamAutoLocked ) && ( level.alienTeamLocked || level.alienTeamAutoLocked ) ) {
-        trap_SendServerCommand( ent - g_entities, va( "cp \"Right click to spawn as a spec-granger!\n\"") );
+        if( g_keepSpawn.integer )
+          trap_SendServerCommand( ent - g_entities, va( "cp \"Right click to spawn as a spec-granger! (really)\n\"") );
       } else {
         trap_SendServerCommand( ent - g_entities, va( "cp \"Feel free to join the other team.\n\"") );
       }

@@ -1274,7 +1274,7 @@ void Trace_Box(trace_t *tr, vec3_t start, vec3_t mins, vec3_t maxs, vec3_t end, 
   
   rayAABBIntersect(start2, end2, mins2, maxs2, &tr->fraction);
 
-  tr->fraction -= 1./Distance(start, end);
+  tr->fraction -= 2./Distance(start, end);
 
   if( tr->fraction < 0 )
     tr->fraction = 0;
@@ -1304,7 +1304,7 @@ gentity_t *AHovel_Blocked( gentity_t *hovel, gentity_t *player, qboolean provide
   vec3_t up = {0,0,1};
   float     displacement;
   trace_t   tr;
-  vec3_t mins={-32,-32,-38}, maxs = {32,32,38};
+  vec3_t mins={-33,-33,-39}, maxs = {32,32,39};
   
   int entityPassNum = -1;
   int contentmask = CONTENTS_SOLID|CONTENTS_PLAYERCLIP|CONTENTS_BODY;
@@ -1445,7 +1445,7 @@ Called when an alien uses a hovel
 */
 void AHovel_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 {
-  gentity_t *otherh;
+  gentity_t *otherh, *blocker;
   int other_index;
 
   if( !self->spawned ) return;
@@ -1456,16 +1456,16 @@ void AHovel_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
   other_index = G_FindNextHovel(self);
   if (other_index == -1)
   {
-    //using same error for only one hovel built
-    G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_BLOCKED );
+    trap_SendServerCommand( activator - level.gentities, "cp \"^7Only one hovel built\"" );
     return;
   }
   
   otherh = g_entities + other_index;
-  if( AHovel_Blocked( otherh, activator, qtrue ) )
+  if( blocker = AHovel_Blocked( otherh, activator, qtrue ) )
   {
     //exit blocked
-    G_TriggerMenu( activator->client->ps.clientNum, MN_A_HOVEL_BLOCKED );
+    if( blocker->client) trap_SendServerCommand( blocker - level.gentities, va( "cp \"^1You blocked %s^1. Happy?\"", activator->client ? activator->client->pers.netname : "console" ) );
+    trap_SendServerCommand( activator - level.gentities, va( "cp \"^7Hovel blocked by %s\"", blocker->client ? blocker->client->pers.netname : va( "something\nthat shouldn't exist (%i)", blocker->s.eType ) ) );
     return;
   }
   else
@@ -1497,17 +1497,26 @@ void AHovel_Think( gentity_t *self )
     //only suicide if at rest
     if( self->s.groundEntityNum )
     {
-      if( ( ent = AHovel_Blocked( self, NULL, qfalse ) ) != NULL )
+      if( ent = AHovel_Blocked( self, NULL, qfalse ) )
       {
         // If the thing blocking the spawn is a buildable, kill it. 
         // If it's part of the map, kill self. 
         if( ent->s.eType == ET_BUILDABLE )
         {
           G_Damage( ent, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+          if( ent == self )
+            trap_SendServerCommand( -1, "print \"Hovel killed blocking buildable (self)\n\"");
         }
-        else if( ent->s.number == ENTITYNUM_WORLD || ent->s.eType == ET_MOVER )
+        else if( ent->s.number == ENTITYNUM_WORLD )
         {
           G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+          trap_SendServerCommand( -1, "print \"Hovel killed self due to blocking world\n\"");
+          return;
+        }
+        else if( ent->s.eType == ET_MOVER )
+        {
+          G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+          trap_SendServerCommand( -1, "print \"Hovel killed self due to blocking mover\n\"");
           return;
         }
         else if( g_antiSpawnBlock.integer && ent->client )
@@ -1518,6 +1527,7 @@ void AHovel_Think( gentity_t *self )
             //five seconds of countermeasures and we're still blocked
             //time for something more drastic
             G_Damage( ent, NULL, NULL, NULL, NULL, 10000, 0, MOD_TRIGGER_HURT );
+          trap_SendServerCommand( -1, "print \"Hovel killed blocking player\n\"");
             self->spawnBlockTime += 2000;
             //inappropriate MOD but prints an apt obituary
           }
@@ -1539,7 +1549,7 @@ void AHovel_Think( gentity_t *self )
           else if( !self->spawnBlockTime )
             self->spawnBlockTime = level.time;
        }
-       if( ent->s.eType == ET_CORPSE )
+       else if( ent->s.eType == ET_CORPSE )
          G_FreeEntity( ent ); //quietly remove
       }
       else
@@ -2066,7 +2076,7 @@ Think for armoury
 */
 void HArmoury_Think( gentity_t *self )
 {
-  if( level.extremeSuddenDeath && !self->powered )
+  if( level.extremeSuddenDeath && !self->powered && level.reactorPresent )
   {
 	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
 	}
@@ -2132,7 +2142,7 @@ Think for dcc
 */
 void HDCC_Think( gentity_t *self )
 {
-  if( level.extremeSuddenDeath && !self->powered )
+  if( level.extremeSuddenDeath && !self->powered && level.reactorPresent )
   {
 	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
 	}
@@ -2164,7 +2174,7 @@ void HMedistat_Think( gentity_t *self )
   
   self->nextthink = level.time + BG_FindNextThinkForBuildable( self->s.modelindex );
   
-  if( level.extremeSuddenDeath && !self->powered )
+  if( level.extremeSuddenDeath && !self->powered && level.reactorPresent )
   {
 	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
 	}
@@ -2495,7 +2505,7 @@ void HMGTurret_Think( gentity_t *self )
   //used for client side muzzle flashes
   self->s.eFlags &= ~EF_FIRING;
 
-  if( level.extremeSuddenDeath && !self->powered )
+  if( level.extremeSuddenDeath && !self->powered && level.reactorPresent )
   {
 	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
 	}
@@ -2567,7 +2577,7 @@ void HTeslaGen_Think( gentity_t *self )
 
   self->nextthink = level.time + BG_FindNextThinkForBuildable( self->s.modelindex );
   
-  if( level.extremeSuddenDeath && !self->powered )
+  if( level.extremeSuddenDeath && !self->powered && level.reactorPresent )
   {
 	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
 	}
@@ -2774,6 +2784,11 @@ Think for human spawn
 void HSpawn_Think( gentity_t *self )
 {
   gentity_t *ent;
+
+  if( level.extremeSuddenDeath )
+  {
+	G_Damage( self, NULL, NULL, NULL, NULL, 10000, 0, MOD_SUICIDE );
+	}
 
   // spawns work without power
   self->powered = qtrue;
