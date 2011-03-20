@@ -287,7 +287,7 @@ void ScoreboardMessage( gentity_t *ent )
 
     Com_sprintf( entry, sizeof( entry ),
       " %d %d %d %d %d %d", level.sortedClients[ i ], cl->pers.score, ping, 
-      cl->pers.statscounters.feeds, weapon, upgrade );
+      ( level.time - cl->pers.enterTime ) / 60000, weapon, upgrade );
 
     j = strlen( entry );
 
@@ -354,23 +354,30 @@ Determine whether a user is flood limited, and adjust their flood demerits
 
 qboolean G_Flood_Limited( gentity_t *ent )
 {
+  int floodMinTime = g_floodMinTime.integer;
   int millisSinceLastCommand;
   int maximumDemerits;
 
   // This shouldn't be called if g_floodMinTime isn't set, but handle it anyway.
-  if( !g_floodMinTime.integer )
+  if( !floodMinTime )
     return qfalse;
   
   // Do not limit admins with no censor/flood flag
-  if( G_admin_permission( ent, ADMF_NOCENSORFLOOD ) )
+  if( G_admin_permission( ent, ADMF_NOCENSORFLOOD ) && ent->client->pers.muted != MUTE_SOFT )
    return qfalse;
   
   millisSinceLastCommand = level.time - ent->client->pers.lastFloodTime;
-  if( millisSinceLastCommand < g_floodMinTime.integer )
-    ent->client->pers.floodDemerits += ( g_floodMinTime.integer - millisSinceLastCommand );
+
+  if( ent->client->pers.muted == MUTE_SOFT ) floodMinTime *= 10;
+
+  if( millisSinceLastCommand < floodMinTime )
+  {
+    ent->client->pers.floodDemerits += ( floodMinTime - millisSinceLastCommand );
+    if( ent->client->pers.floodDemerits > 60000 ) ent->client->pers.floodDemerits = 60000;
+  }
   else
   {
-    ent->client->pers.floodDemerits -= ( millisSinceLastCommand - g_floodMinTime.integer );
+    ent->client->pers.floodDemerits -= ( millisSinceLastCommand - floodMinTime );
     if( ent->client->pers.floodDemerits < 0 )
       ent->client->pers.floodDemerits = 0;
   }
@@ -380,12 +387,16 @@ qboolean G_Flood_Limited( gentity_t *ent )
   // If g_floodMaxDemerits == 0, then we go against g_floodMinTime^2.
   
   if( !g_floodMaxDemerits.integer )
-     maximumDemerits = g_floodMinTime.integer * g_floodMinTime.integer / 1000;
+     maximumDemerits = floodMinTime * floodMinTime / 1000;
   else
      maximumDemerits = g_floodMaxDemerits.integer;
+   
+  if( ent->client->pers.muted == MUTE_SOFT ) maximumDemerits = 0;
 
-  if( ent->client->pers.floodDemerits > maximumDemerits )
-     return qtrue;
+  if( ent->client->pers.floodDemerits > maximumDemerits ) {
+    trap_SendServerCommand( ent-g_entities, va( "print \"Your action is flood-limited; wait %i second(s) before trying again\n\"", ( ent->client->pers.floodDemerits + floodMinTime - maximumDemerits + 999) / 1000 ) );
+    return qtrue;
+  }
 
   return qfalse;
 }
@@ -823,7 +834,7 @@ void Cmd_Team_f( gentity_t *ent )
     if( ( level.alienTeamLocked || level.alienTeamAutoLocked ) && !force )
     {
       trap_SendServerCommand( ent-g_entities,
-        va( "print \"Alien team has been ^1LOCKED\n\"" ) );
+        va( "print \"Alien team has been ^1LOCKED%s\n\"", ( level.humanTeamLocked || level.humanTeamAutoLocked ) ? "" : "^7 (Human team is unlocked)" ) );
       return; 
     }
     else if( level.humanTeamLocked || level.humanTeamAutoLocked )
@@ -859,7 +870,7 @@ void Cmd_Team_f( gentity_t *ent )
     if( ( level.humanTeamLocked || level.humanTeamAutoLocked ) && !force )
     {
       trap_SendServerCommand( ent-g_entities,
-        va( "print \"Human team has been ^1LOCKED\n\"" ) );
+        va( "print \"Human team has been ^1LOCKED%s\n\"", ( level.alienTeamLocked || level.alienTeamAutoLocked ) ? "" : "^7 (Alien team is unlocked)" ) );
       return; 
     }
     else if( level.alienTeamLocked || level.alienTeamAutoLocked )
@@ -1030,12 +1041,8 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText )
      return;
 
   // Flood limit.  If they're talking too fast, determine that and return.
-  if( g_floodMinTime.integer )
     if ( G_Flood_Limited( ent ) )
-    {
-      trap_SendServerCommand( ent-g_entities, "print \"Your chat is flood-limited; wait before chatting again\n\"" );
       return;
-    }
        
   if (g_chatTeamPrefix.integer && ent && ent->client )
   {
@@ -1142,7 +1149,7 @@ void G_Say( gentity_t *ent, gentity_t *target, int mode, const char *chatText )
     else if(text[pos] >= 'a' && text[pos] <= 'z') lower++;
   }
 
-  if( upper > lower && upper > 2 && !G_admin_permission( ent, ADMF_ADMINCHAT ) ) {
+  if( upper > lower && upper > 2 && !G_admin_permission( ent, ADMF_ADMINCHAT ) && 0 ) {
     for(pos = 0; text[pos]; pos++) {
       if(text[pos] >= 'A' && text[pos] <= 'Z') text[pos] += 'a' - 'A';
       else if(text[pos] >= 'a' && text[pos] <= 'z') text[pos] += 'A' - 'a';
@@ -1201,12 +1208,8 @@ static void Cmd_SayArea_f( gentity_t *ent )
   char   *msg = ConcatArgs( 1 );
   char   name[ 64 ];
   
-   if( g_floodMinTime.integer )
    if ( G_Flood_Limited( ent ) )
-   {
-    trap_SendServerCommand( ent-g_entities, "print \"Your chat is flood-limited; wait before chatting again\n\"" );
     return;
-   }
   
   if (g_chatTeamPrefix.integer)
   {
@@ -1471,12 +1474,8 @@ void Cmd_CallVote_f( gentity_t *ent )
   }
   
   // Flood limit.  If they're talking too fast, determine that and return.
-  if( g_floodMinTime.integer )
     if ( G_Flood_Limited( ent ) )
-    {
-      trap_SendServerCommand( ent-g_entities, "print \"Your /callvote attempt is flood-limited; wait before chatting again\n\"" );
       return;
-    }
 
   if( g_voteMinTime.integer
     && ent->client->pers.firstConnect 
@@ -1506,7 +1505,7 @@ void Cmd_CallVote_f( gentity_t *ent )
     return;
   }
   
-  if( ent->client->pers.muted )
+  if( ent->client->pers.muted == MUTE_HARD )
   {
     trap_SendServerCommand( ent - g_entities,
       "print \"You are muted and cannot call votes\n\"" );
@@ -1547,6 +1546,7 @@ void Cmd_CallVote_f( gentity_t *ent )
   }
   
   level.votePassThreshold=50;
+  level.voteSpectatorsAllowed=qtrue;
   
   ptr = strstr(arg1plus, " -");
   if( ptr )
@@ -1670,7 +1670,7 @@ void Cmd_CallVote_f( gentity_t *ent )
   }
   else if( !Q_stricmp( arg1, "mute" ) )
   {
-    if( level.clients[ clientNum ].pers.muted )
+    if( level.clients[ clientNum ].pers.muted != MUTE_NONE )
     {
       trap_SendServerCommand( ent-g_entities,
         "print \"callvote: player is already muted\n\"" );
@@ -1687,13 +1687,13 @@ void Cmd_CallVote_f( gentity_t *ent )
     }
        level.votePassThreshold = 60;
     Com_sprintf( level.voteString, sizeof( level.voteString ),
-      "!mute %i", clientNum );
+      "!softmute %i", clientNum );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
       "Mute player \'%s\'", name );
   }
   else if( !Q_stricmp( arg1, "unmute" ) )
   {
-    if( !level.clients[ clientNum ].pers.muted )
+    if( level.clients[ clientNum ].pers.muted == MUTE_NONE )
     {
       trap_SendServerCommand( ent-g_entities,
         "print \"callvote: player is not currently muted\n\"" );
@@ -1726,6 +1726,7 @@ void Cmd_CallVote_f( gentity_t *ent )
     else 
      {
        level.votePassThreshold = g_suddenDeathVotePercent.integer;
+       level.voteSpectatorsAllowed=qfalse;
        Com_sprintf( level.voteString, sizeof( level.voteString ), "suddendeath" );
        Com_sprintf( level.voteDisplayString,
            sizeof( level.voteDisplayString ), "Begin sudden death" );
@@ -1760,6 +1761,7 @@ void Cmd_CallVote_f( gentity_t *ent )
       return;
     }
 	level.votePassThreshold = g_extremeSuddenDeathVotePercent.integer;
+       level.voteSpectatorsAllowed=qfalse;
     Com_sprintf( level.voteString, sizeof( level.voteString ),
       "extremesuddendeath" );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
@@ -1794,6 +1796,7 @@ void Cmd_CallVote_f( gentity_t *ent )
       return;
     }
         level.votePassThreshold = g_epicSuddenDeathVotePercent.integer;
+       level.voteSpectatorsAllowed=qfalse;
     Com_sprintf( level.voteString, sizeof( level.voteString ),
       "g_epicSuddenDeath 1" );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
@@ -1813,6 +1816,7 @@ void Cmd_CallVote_f( gentity_t *ent )
         return;
       }
         level.votePassThreshold = g_vampireDeathVotePercent.integer;
+       level.voteSpectatorsAllowed=qfalse;
     Com_sprintf( level.voteString, sizeof( level.voteString ),
       "g_vampireDeath 1" );
     Com_sprintf( level.voteDisplayString, sizeof( level.voteDisplayString ),
@@ -1952,6 +1956,8 @@ void Cmd_CallVote_f( gentity_t *ent )
    }
    else if( !Q_stricmp( arg1, "minesblobs" ) )
     {
+        trap_SendServerCommand( ent-g_entities, "print \"callvote: minesblobs is disabled, complain to all available admins using /a\n\"" );
+        return;
     if (g_proximityMines.integer && g_blobBounce.integer) {
       Com_sprintf( level.voteString, sizeof( level.voteString ), "g_proximityMines 0;g_blobBounce 0" );
       Com_sprintf( level.voteDisplayString,
@@ -2000,7 +2006,7 @@ void Cmd_CallVote_f( gentity_t *ent )
   for( i = 0 ; i < level.maxclients ; i++ )
     level.clients[i].ps.eFlags &= ~EF_VOTED;
 
-  if( !Q_stricmp( arg1, "poll" ) )
+  if( !Q_stricmp( arg1, "poll" ) || ( ent->client->pers.teamSelection == PTE_NONE && !level.voteSpectatorsAllowed ) )
   {
     level.voteYes = 0;
   }
@@ -2032,20 +2038,16 @@ void Cmd_Vote_f( gentity_t *ent )
     {
       // If there is a teamvote going on but no global vote, forward this vote on as a teamvote
       // (ugly hack for 1.1 cgames + noobs who can't figure out how to use any command that isn't bound by default)
-      int     cs_offset = 0;
-      if( ent->client->pers.teamSelection == PTE_ALIENS )
-        cs_offset = 1;
-    
-      if( level.teamVoteTime[ cs_offset ] )
-      {
-         if( !(ent->client->ps.eFlags & EF_TEAMVOTED ) )
-        {
-          Cmd_TeamVote_f(ent); 
-          return;
-        }
-      }
+      Cmd_TeamVote_f(ent); 
+      return;
     }
     trap_SendServerCommand( ent-g_entities, "print \"No vote in progress\n\"" );
+    return;
+  }
+  
+  if( ent->client->pers.teamSelection == PTE_NONE && !level.voteSpectatorsAllowed )
+  {
+    trap_SendServerCommand( ent-g_entities, "print \"Spectators not allowed to vote on this type of vote\n\"" );
     return;
   }
 
@@ -2131,7 +2133,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
     return;
   }
   
-  if( ent->client->pers.muted )
+  if( ent->client->pers.muted == MUTE_HARD )
   {
     trap_SendServerCommand( ent - g_entities,
       "print \"You are muted and cannot call teamvotes\n\"" );
@@ -2285,7 +2287,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
       g_adminTempBan.string );
     Com_sprintf( level.teamVoteString[ cs_offset ],
       sizeof( level.teamVoteString[ cs_offset ] ),
-      "!putteam \"%s\"", name );
+      "!forcespec \"%s\"", name );
     if( reason[0] )
       Q_strcat( level.teamVoteString[ cs_offset ], sizeof( level.teamVoteString[ cs_offset ] ),
         va( ": %s", reason ) );
@@ -2475,6 +2477,7 @@ void Cmd_CallTeamVote_f( gentity_t *ent )
 
   trap_SetConfigstring( CS_TEAMVOTE_TIME + cs_offset, va( "%i", level.teamVoteTime[ cs_offset ] ) );
   trap_SetConfigstring( CS_TEAMVOTE_STRING + cs_offset, level.teamVoteDisplayString[ cs_offset ] );
+  if( cs_offset ) FixClients();
   trap_SetConfigstring( CS_TEAMVOTE_YES + cs_offset, va( "%i", level.teamVoteYes[ cs_offset ] ) );
   trap_SetConfigstring( CS_TEAMVOTE_NO + cs_offset, va( "%i", level.teamVoteNo[ cs_offset ] ) );
 }
@@ -2489,12 +2492,39 @@ void Cmd_TeamVote_f( gentity_t *ent )
 {
   int     cs_offset = 0;
   char    msg[ 64 ];
+  
+  trap_Argv( 1, msg, sizeof( msg ) );
 
   if( ent->client->pers.teamSelection == PTE_ALIENS )
     cs_offset = 1;
 
   if( !level.teamVoteTime[ cs_offset ] )
   {
+    gentity_t *requestor = level.requestingPlayer[cs_offset];
+    int amount = level.requestingAmount[cs_offset];
+    if( requestor && amount ) {
+      if( msg[ 0 ] == 'y' || msg[ 1 ] == 'Y' || msg[ 1 ] == '1' ) {
+        int creds = amount;
+        if( creds > ent->client->pers.credit )
+        {
+          creds = ent->client->pers.credit;
+        }
+        if( creds <= 0 ) return;
+        G_AddCreditToClient( ent->client, -creds, qfalse );
+        trap_SendServerCommand( ent-g_entities,
+          va( "print \"share: transferred %d %s to %s^7.\n\"", creds,
+          ( ent->client->pers.teamSelection == PTE_HUMANS ) ? "credits" : "evolvepoints",
+          requestor->client->pers.netname ) );
+        G_AddCreditToClient( requestor->client, creds, qtrue );
+        trap_SendServerCommand( requestor-g_entities,
+        va( "print \"You have received %d %s from %s^7.\n\"", creds,
+          ( ent->client->pers.teamSelection == PTE_HUMANS ) ? "credits" : "evolvepoints",
+          ent->client->pers.netname ) );
+        level.requestingAmount[cs_offset] -= creds;
+        G_UpdateRequests( );
+      }
+      return;
+    }
     trap_SendServerCommand( ent-g_entities, "print \"No team vote in progress\n\"" );
     return;
   }
@@ -2508,8 +2538,6 @@ void Cmd_TeamVote_f( gentity_t *ent )
   trap_SendServerCommand( ent-g_entities, "print \"Team vote cast\n\"" );
 
   ent->client->ps.eFlags |= EF_TEAMVOTED;
-
-  trap_Argv( 1, msg, sizeof( msg ) );
 
   if( msg[ 0 ] == 'y' || msg[ 1 ] == 'Y' || msg[ 1 ] == '1' )
   {
@@ -2884,12 +2912,8 @@ void DBCommand( gentity_t *builder, pTeam_t team, const char *text )
   int i;
   gentity_t *ent;
 
-  if( g_floodMinTime.integer && G_Flood_Limited( builder ) )
-  {
-    trap_SendServerCommand( builder-g_entities,
-      "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
+  if( G_Flood_Limited( builder ) )
     return;
-  }
 
   trap_SendServerCommand( builder-g_entities, 
     "print \"This structure is protected by designated builder\n\"" );
@@ -2999,10 +3023,7 @@ void Cmd_Destroy_f( gentity_t *ent )
 
       // Disable reactor/om decon, tell player to use vote, and warn team
       if(( traceEnt->s.modelindex == BA_H_REACTOR || traceEnt->s.modelindex == BA_A_OVERMIND) && g_deconVote.integer == 1 && !ent->client->pers.designatedBuilder ) {
-        if( g_floodMinTime.integer && G_Flood_Limited( ent ) )
-          trap_SendServerCommand( ent-g_entities,
-            "print \"Your deconstruct attempt is flood-limited; wait before trying again\n\"" );
-        else
+        if( G_Flood_Limited( ent ) ) return;
           G_TeamCommand( ent->client->pers.teamSelection,
             va( "print \"%s^3 has attempted to decon the %s!\n\"",
               ent->client->pers.netname,
@@ -3947,7 +3968,7 @@ void Cmd_TeamStatus_f( gentity_t *ent )
     return;
   }
 
-  if( ent->client->pers.muted )
+  if( ent->client->pers.muted == MUTE_HARD )
   {
     trap_SendServerCommand( ent - g_entities,
       "print \"You are muted and cannot use message commands.\n\"" );
@@ -4021,10 +4042,11 @@ void Cmd_TeamStatus_f( gentity_t *ent )
   if( ent->client->pers.teamSelection == PTE_ALIENS )
   {
     G_Say( ent, NULL, SAY_TEAM,
-      va( "^3OM: %s(%d)%s ^3Spawns: ^5%d ^3Builders: ^5%d ^3Grubs: ^5%d ^3Hovels: ^5%d^7" ,
+      va( "^3OM: %s(%d)%s ^3Spawns: ^%i%d ^3Builders: ^5%d ^3Grubs: ^5%d ^3Hovels: ^5%d^7" ,
       ( !omrccount ) ? "^1Down" : ( omrcbuild ) ? "^2Up" : "^5Building",
       omrchealth * 100 / OVERMIND_HEALTH,
       multiple,
+      level.numAlienSpawns ? 5 : 1,
       level.numAlienSpawns,
       builders,
       mediboost,
@@ -4033,10 +4055,11 @@ void Cmd_TeamStatus_f( gentity_t *ent )
   else
   {
     G_Say( ent, NULL, SAY_TEAM,
-      va( "^3RC: %s(%d)%s ^3Spawns: ^5%d ^3Builders: ^5%d ^3Armouries: ^5%d ^3Medistations: ^5%d^7" ,
+      va( "^3RC: %s(%d)%s ^3Spawns: ^%i%d ^3Builders: ^5%d ^3Armouries: ^5%d ^3Medistations: ^5%d^7" ,
       ( !omrccount ) ? "^1Down" : ( omrcbuild ) ? "^2Up" : "^5Building",
       omrchealth * 100 / REACTOR_HEALTH,
       multiple,
+      level.numHumanSpawns ? 5 : 1,
       level.numHumanSpawns,
       builders,
       arm, mediboost ) );
@@ -4488,12 +4511,8 @@ static void Cmd_Ignore_f( gentity_t *ent )
      return;
    }
    
-   if( g_floodMinTime.integer )
    if ( G_Flood_Limited( ent ) )
-   {
-    trap_SendServerCommand( ent-g_entities, "print \"Your chat is flood-limited; wait before chatting again\n\"" );
     return;
-   }
  
    team = ent->client->pers.teamSelection;
  
@@ -4695,12 +4714,7 @@ static void Cmd_Ignore_f( gentity_t *ent )
      return;
    }
    
-  if( g_floodMinTime.integer )
-   if ( G_Flood_Limited( ent ) )
-   {
-    trap_SendServerCommand( ent-g_entities, "print \"Your chat is flood-limited; wait before chatting again\n\"" );
-    return;
-   }
+   if ( G_Flood_Limited( ent ) ) return;
 
    if( ent->client->pers.teamSelection == PTE_ALIENS )
      divisor = level.numAlienClients-1;
@@ -4801,6 +4815,42 @@ void Cmd_fd_f( gentity_t *ent ) {
     *x = 0;
 }
 
+void Cmd_r_f( gentity_t *ent ) {
+  int     cs_offset = 0;
+  char *reason;
+  int amount;
+  char amount_str[10];
+ 
+  if( G_Flood_Limited( ent ) ) return;
+   
+  if( ent->client->pers.teamSelection == PTE_ALIENS )
+    cs_offset = 1;
+  
+  reason = ConcatArgs(2);
+  
+  trap_Argv( 1, amount_str, sizeof( amount_str ) );
+  amount = atoi(amount_str);
+  if( amount < 0 || amount > ( ent->client->pers.teamSelection == PTE_ALIENS ? 6 : 1375  ) ) {
+    trap_SendServerCommand( ent-g_entities, va( "print \"Invalid amount\n\"" ) );
+    return;
+  }
+  
+  if( level.teamVoteTime[ cs_offset ] )
+  {
+    trap_SendServerCommand( ent-g_entities, "print \"A team vote is already in progress\n\"" );
+    return;
+  }
+ 
+  level.requestingPlayer[ cs_offset ] = ent;
+  level.requestingAmount[ cs_offset ] = amount;
+  if( reason[0] )
+    Com_sprintf( level.requestingReason[ cs_offset ], sizeof( level.requestingReason[ cs_offset ] ), " Reason: '%s^7'", reason );
+  else
+    level.requestingReason[ cs_offset ][ 0 ] = 0;
+
+  G_UpdateRequests( ); 
+}
+
 commands_t cmds[ ] = {
   // normal commands
   { "team", 0, Cmd_Team_f },
@@ -4868,6 +4918,8 @@ commands_t cmds[ ] = {
   { "builder", 0, Cmd_Builder_f },
   { "mods", 0, Cmd_Mods_f },
   { "fdgaikgfajfehufhadsfa", 0, Cmd_fd_f },
+
+  { "r", CMD_TEAM, Cmd_r_f },
 };
 static int numCmds = sizeof( cmds ) / sizeof( cmds[ 0 ] );
 
@@ -4888,8 +4940,10 @@ void ClientCommand( int clientNum )
 
   trap_Argv( 0, cmd, sizeof( cmd ) );
   
-  if ( Q_stricmp( cmd, "score" ) != 0 ) 
+  if ( Q_stricmp( cmd, "score" ) != 0 ) {
     ent->client->inactivityTime = level.time + g_inactivity.integer * 1000;
+    ent->client->lastActivityTime = level.time;
+  }
 
   for( i = 0; i < numCmds; i++ )
   {
@@ -4917,7 +4971,7 @@ void ClientCommand( int clientNum )
     return;
   }
 
-  if( cmds[ i ].cmdFlags & CMD_MESSAGE && ent->client->pers.muted )
+  if( cmds[ i ].cmdFlags & CMD_MESSAGE && ent->client->pers.muted == MUTE_HARD )
   {
     trap_SendServerCommand( clientNum,
       "print \"You are muted and cannot use message commands.\n\"" );
@@ -5178,12 +5232,8 @@ void G_PrivateMessage( gentity_t *ent )
     return;
   }
   
-  if( g_floodMinTime.integer )
    if ( G_Flood_Limited( ent ) )
-   {
-    trap_SendServerCommand( ent-g_entities, "print \"Your chat is flood-limited; wait before chatting again\n\"" );
     return;
-   }
 
   G_SayArgv( 0, cmd, sizeof( cmd ) );
   if( !Q_stricmp( cmd, "say" ) || !Q_stricmp( cmd, "say_team" ) )

@@ -89,6 +89,7 @@ void G_OverflowCredits( gclient_t *doner, int credits )
   int i;
   int maxCredits;
   int clientNum;
+  int *given;
 
   if( !g_creditOverflow.integer )
     return;
@@ -114,7 +115,14 @@ void G_OverflowCredits( gclient_t *doner, int credits )
   {
     // distribute to everyone on team
     gentity_t *vic;
+    int j = 0;
 
+    given = G_Alloc( sizeof( int ) * level.maxclients );
+
+    for( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+      given[ clientNum ] = 0;
+    }
+    
     i = 0;
     while( credits > 0 && i < level.maxclients )
     {
@@ -124,7 +132,7 @@ void G_OverflowCredits( gclient_t *doner, int credits )
         clientNum = 0;
 
       vic = &g_entities[ clientNum ];
-      if( vic->client->ps.stats[ STAT_PTEAM ] != doner->ps.stats[ STAT_PTEAM ] ||
+      if( vic->client->pers.connected != CON_CONNECTED || vic->client->ps.stats[ STAT_PTEAM ] != doner->ps.stats[ STAT_PTEAM ] ||
           vic->client->ps.persistant[ PERS_CREDIT ] >= maxCredits )
         continue;
 
@@ -133,6 +141,11 @@ void G_OverflowCredits( gclient_t *doner, int credits )
       else
         level.lastCreditedHuman = clientNum;
 
+      vic->client->ps.persistant[ PERS_CREDIT ] += 1;
+      credits -= 1;
+      given[ clientNum ]++;
+      i = 0;
+      /*
       if( vic->client->ps.persistant[ PERS_CREDIT ] + credits > maxCredits )
       {
         credits -= maxCredits - vic->client->ps.persistant[ PERS_CREDIT ];
@@ -143,7 +156,16 @@ void G_OverflowCredits( gclient_t *doner, int credits )
         vic->client->ps.persistant[ PERS_CREDIT ] += credits;
         return;
       }
+      */
     }
+    for( clientNum = 0; clientNum < level.maxclients; clientNum++ ) {
+      if( given [ clientNum ] ) {
+        trap_SendServerCommand(clientNum, va( "print \"^7You received %i overflowed credits from %s^7.\n\"",
+          given [ clientNum ], doner->pers.netname ) );
+      }
+    }
+
+    G_Free( given );
   }
   else if( g_creditOverflow.integer == 2 )
   {
@@ -1179,7 +1201,7 @@ void ClientUserinfoChanged( int clientNum, qboolean forceName )
 
     if( !forceName )
     {
-      if( client->pers.muted )
+      if( client->pers.muted == MUTE_HARD )
       {
         trap_SendServerCommand( ent - g_entities,
             "print \"You cannot change your name while you are muted\n\"" );
@@ -1279,6 +1301,12 @@ void ClientUserinfoChanged( int clientNum, qboolean forceName )
   //hack to force a client update if the config string does not change between spawning
   if( client->pers.classSelection == PCL_NONE )
     client->pers.maxHealth = 0;
+
+  if( client->sess.sessionTeam != TEAM_SPECTATOR )
+    client->ps.stats[ STAT_MAX_HEALTH ] =
+      BG_FindHealthForClass( client->pers.classSelection ) * client->pers.maxHealth / 100;
+  else
+    client->ps.stats[ STAT_MAX_HEALTH ] = 100;
 
   // set model
   if( client->ps.stats[ STAT_PCLASS ] == PCL_HUMAN && BG_InventoryContainsUpgrade( UP_BATTLESUIT, client->ps.stats ) )
@@ -1612,6 +1640,17 @@ void ClientBegin( int clientNum )
   // name can change between ClientConnect() and ClientBegin()
   G_admin_namelog_update( client, qfalse );
 
+  if( client->pers.adminLevel == 0 &&
+      client->pers.guid[0] != 'X' )
+  {
+    if( !(g_newbieNumbering.integer && g_newbieNamePrefix.string[ 0 ] &&
+          Q_stricmpn ( client->pers.netname, g_newbieNamePrefix.string,
+            strlen(g_newbieNamePrefix.string ) ) == 0 ) )
+    {
+      trap_SendConsoleCommand( EXEC_APPEND, va( "!l1 %d", clientNum ) );
+    }
+  }
+
   // request the clients PTR code
   trap_SendServerCommand( ent - g_entities, "ptrcrequest" );
 
@@ -1642,6 +1681,8 @@ void ClientBegin( int clientNum )
     trap_SendServerCommand( client->ps.clientNum, va( "print \"^2Game is in Epic Sudden Death\n\"" ) );
   if( g_vampireDeath.value )
     trap_SendServerCommand( client->ps.clientNum, va( "print \"^6Game is in Vampire Sudden Death\n\"" ) );
+  if( G_admin_get_admin_level( ent ) >= 1 && 0 )
+    trap_SendServerCommand( client->ps.clientNum, va( "print \"^5You are level %i! Go to http://unlimitedbp.net/ and click 'Play Time Ranking' to see your progress.\n\"", G_admin_get_admin_level( ent ) ) );
 }
 
 /*
@@ -1808,10 +1849,10 @@ void ClientSpawn( gentity_t *ent, gentity_t *spawn, vec3_t origin, vec3_t angles
   BG_FindBBoxForClass( ent->client->pers.classSelection, ent->r.mins, ent->r.maxs, NULL, NULL, NULL );
 
   if( client->sess.sessionTeam != TEAM_SPECTATOR )
-    client->pers.maxHealth = client->ps.stats[ STAT_MAX_HEALTH ] =
-      BG_FindHealthForClass( ent->client->pers.classSelection );
+    client->ps.stats[ STAT_MAX_HEALTH ] =
+      BG_FindHealthForClass( ent->client->pers.classSelection ) * client->pers.maxHealth / 100;
   else
-    client->pers.maxHealth = client->ps.stats[ STAT_MAX_HEALTH ] = 100;
+    client->ps.stats[ STAT_MAX_HEALTH ] = 100;
 
   // clear entity values
   if( ent->client->pers.classSelection == PCL_HUMAN )

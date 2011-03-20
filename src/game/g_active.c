@@ -544,6 +544,11 @@ Returns qfalse if the client is dropped
 */
 qboolean ClientInactivityTimer( gclient_t *client )
 {
+  if( client->pers.cmd.forwardmove ||
+           client->pers.cmd.rightmove ||
+           client->pers.cmd.upmove ||
+           ( client->pers.cmd.buttons & BUTTON_ATTACK ) )
+    client->lastActivityTime = level.time;
   if( ! g_inactivity.integer || G_admin_permission( &g_entities[ client->ps.clientNum ], ADMF_IMMUNITY ) || client->ps.clientNum < g_privateClients.integer )
   {
     // give everyone some time, so if the operator sets g_inactivity during
@@ -626,8 +631,8 @@ void ClientTimerActions( gentity_t *ent, int msec )
   if( BG_InventoryContainsUpgrade( UP_JETPACK, client->ps.stats ) && BG_UpgradeIsActive( UP_JETPACK, client->ps.stats ) ) {
     if( !client->jetpackWasActive ) {
       client->jetpackWasActive = qtrue;
-      if( jumping && g_fueledjetpack.integer ) {
-        if( client->jetpackfuel >= 20 ) {
+      if( jumping && g_jetjump.integer ) {
+        if( !g_fueledjetpack.integer || client->jetpackfuel >= 20 ) {
           vec3_t dir = {0, 0, 1};
           G_Knockback( ent, dir, 500. );
           client->jetpackfuel -= 20;
@@ -1023,9 +1028,8 @@ void ClientTimerActions( gentity_t *ent, int msec )
         //  client->jetpackfuel = client->jetpackfuel + JETPACK_REGEN_RATE;
         //  trap_SendServerCommand( client - level.clients, "cp \"^3Fuel Status:^2Full!!!!!^7\n\"" );
         //} else
-        if( client->jetpackfuel < JETPACK_MAX_FUEL ) 
-          client->jetpackfuel = client->jetpackfuel + JETPACK_REGEN_RATE;
-          if(client->jetpackfuel >= JETPACK_MAX_FUEL) client->jetpackfuel = JETPACK_MAX_FUEL;
+        client->jetpackfuel = client->jetpackfuel + JETPACK_REGEN_RATE;
+        if(client->jetpackfuel >= JETPACK_MAX_FUEL) client->jetpackfuel = JETPACK_MAX_FUEL;
           trap_SendServerCommand( client - level.clients, va( "cp \"                                   ^3Fuel: %s%d%%\"",
             ( client->jetpackfuel*100/JETPACK_MAX_FUEL > 20 ? "^2" : "^1" ),
             (int)(client->jetpackfuel*100/JETPACK_MAX_FUEL)

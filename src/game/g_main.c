@@ -214,6 +214,7 @@ vmCvar_t  g_epicSuddenDeath;
 vmCvar_t  g_epicSuddenDeathVotePercent;
 
 vmCvar_t  g_fueledjetpack;
+vmCvar_t  g_jetjump;
 
 vmCvar_t  g_keepSpawn;
 vmCvar_t  g_keepSpawnX;
@@ -416,6 +417,7 @@ static cvarTable_t   gameCvarTable[ ] =
   { &g_banNotice, "g_banNotice", "", CVAR_ARCHIVE, 0, qfalse  },
 
   { &g_fueledjetpack, "g_fueledjetpack", "0", CVAR_ARCHIVE, 0, qfalse },
+  { &g_jetjump, "g_jetjump", "0", CVAR_ARCHIVE, 0, qfalse },
 
   { &g_proximityMines, "g_proximityMines", "0", 0, 0, qtrue  },
   { &g_blobBounce, "g_blobBounce", "0", 0, 0, qtrue  },
@@ -905,6 +907,7 @@ static void G_ClearVotes( void )
   level.teamVoteTime[ 1 ] = 0;
   trap_SetConfigstring( CS_TEAMVOTE_TIME + 1, "" );
   trap_SetConfigstring( CS_TEAMVOTE_STRING + 1, "" );
+  FixClients();
 }
 
 /*
@@ -2839,6 +2842,30 @@ void CheckTeamVote( int team )
   level.teamVoteTime[ cs_offset ] = 0;
   trap_SetConfigstring( CS_TEAMVOTE_TIME + cs_offset, "" );
   trap_SetConfigstring( CS_TEAMVOTE_STRING + cs_offset, "" );
+  if( cs_offset ) FixClients();
+
+  G_UpdateRequests( );
+}
+
+void G_UpdateRequests() {
+  int cs_offset;
+  for( cs_offset = 0; cs_offset <= 1; cs_offset++ ) {
+    gentity_t *ent = level.requestingPlayer[ cs_offset ];
+    int amount = level.requestingAmount[ cs_offset ];
+    char *reason = level.requestingReason[ cs_offset ];
+    if( level.teamVoteTime[ cs_offset ] ) continue;
+    if( ent && amount ) {
+      trap_SetConfigstring( CS_TEAMVOTE_TIME + cs_offset, va( "%i", 1 ) );
+      trap_SetConfigstring( CS_TEAMVOTE_STRING + cs_offset, va( "Give %s^7 %i %s?%s", ent->client->pers.netname, amount, cs_offset ? "evolvepoints" : "credits", reason ) );
+      if( cs_offset ) FixClients();
+      trap_SetConfigstring( CS_TEAMVOTE_YES + cs_offset, "0" );
+      trap_SetConfigstring( CS_TEAMVOTE_NO + cs_offset, "0" );
+    } else {
+      trap_SetConfigstring( CS_TEAMVOTE_TIME + cs_offset, "" );
+      trap_SetConfigstring( CS_TEAMVOTE_STRING + cs_offset, "" );
+      if( cs_offset ) FixClients();
+    }
+  }
 }
 
 /*
@@ -3397,5 +3424,27 @@ void G_RunFrame( int levelTime )
 
     trap_Cvar_Set( "g_listEntity", "0" );
   }
+
+  G_admin_time_update( );
 }
 
+void FixClients( ) {
+  FixConfigString( CS_LEVEL_START_TIME );
+  FixConfigString( CS_BUILDPOINTS );
+  FixConfigString( CS_STAGES );
+  FixConfigString( CS_SPAWNS );
+}
+
+void FixConfigString( int num ) {
+  char x[ MAX_INFO_STRING + 1 ];
+  int i;
+  trap_GetConfigstring( num, x, sizeof( x ) );
+  i = strlen( x );
+  if( i && x[ i - 1 ] == ' ' ) {
+    x[ i - 1 ] = '\0';
+  } else {
+    x[ i ] = ' ';
+    x[ i + 1 ] = '\0';
+  }
+  trap_SetConfigstring( num, x );
+}

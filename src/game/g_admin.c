@@ -342,6 +342,11 @@ g_admin_cmd_t g_admin_cmds[ ] =
       "[^3name|slot^7] (damage)"
     }, 
 
+    {"softmute", G_admin_mute, "mute",
+      "soft-mute a player",
+      "[^3name|slot#^7]"
+    },
+
     {"spec999", G_admin_spec999, "spec999",
       "move 999 pingers to the spectator team",
       ""},
@@ -566,6 +571,9 @@ qboolean G_admin_name_check( gentity_t *ent, char *name, char *err, int len )
   char name2[ MAX_NAME_LENGTH ] = {""};
   int alphaCount = 0;
 
+  if( G_admin_permission( ent, "ANYNAME" ) )
+    return qtrue;
+
   G_SanitiseString( name, name2, sizeof( name2) );
 
   if( !Q_stricmp( name2, "UnnamedPlayer" ) ) 
@@ -755,11 +763,13 @@ void admin_writeconfig( void )
     trap_FS_Write( "guid    = ", 10, f );
     admin_writeconfig_string( g_admin_admins[ i ]->guid, f );
     trap_FS_Write( "level   = ", 10, f );
-    admin_writeconfig_int( g_admin_admins[ i ]->level, f );
+    admin_writeconfig_int( g_admin_admins[ i ]->real_level, f );
     trap_FS_Write( "flags   = ", 10, f );
     admin_writeconfig_string( g_admin_admins[ i ]->flags, f );
     trap_FS_Write( "seen    = ", 10, f );
     admin_writeconfig_int( g_admin_admins[ i ]->seen, f );
+    trap_FS_Write( "time    = ", 10, f );
+    admin_writeconfig_int( g_admin_admins[ i ]->time, f );
     
     cur = g_admin_admins[ i ]->app_yes;
     while( cur ) {
@@ -956,6 +966,34 @@ int G_admin_level( gentity_t *ent )
   if( found )
   {
     return g_admin_admins[ i ]->level;
+  }
+
+  return 0;
+}
+
+int G_admin_real_level( gentity_t *ent )
+{
+  int i;
+  qboolean found = qfalse;
+
+  if( !ent )
+  {
+    return MAX_ADMIN_LEVELS;
+  }
+
+  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ )
+  {
+    if( !Q_stricmp( g_admin_admins[ i ]->guid, ent->client->pers.guid ) )
+    {
+
+      found = qtrue;
+      break;
+    }
+  }
+
+  if( found )
+  {
+    return g_admin_admins[ i ]->real_level;
   }
 
   return 0;
@@ -1503,12 +1541,8 @@ qboolean G_admin_cmd_check( gentity_t *ent, qboolean say )
   }
   
        // Flood limit.  If they're talking too fast, determine that and return.
-  if( g_floodMinTime.integer )
    if ( G_Flood_Limited( ent ) )
-   {
-    trap_SendServerCommand( ent-g_entities, "print \"Your chat is flood-limited; wait before chatting again\n\"" );
     return qtrue;
-   }
 
   for( i = 0; i < MAX_ADMIN_COMMANDS && g_admin_commands[ i ]; i++ )
   {
@@ -1840,6 +1874,7 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
       else if( !Q_stricmp( t, "level" ) )
       {
         admin_readconfig_int( &cnf, &a->level );
+        a->real_level = a->level;
       }
       else if( !Q_stricmp( t, "flags" ) )
       {
@@ -1848,6 +1883,10 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
       else if( !Q_stricmp( t, "seen" ) )
       {
         admin_readconfig_int( &cnf, &a->seen );
+      }
+      else if( !Q_stricmp( t, "time" ) )
+      {
+        admin_readconfig_int( &cnf, &a->time );
       }
       else if( !Q_stricmp( t, "app_yes" ) )
       {
@@ -1956,8 +1995,10 @@ qboolean G_admin_readconfig( gentity_t *ent, int skiparg )
       *a->name = '\0';
       *a->guid = '\0';
       a->level = 0;
+      a->real_level = 0;
       *a->flags = '\0';
       a->seen = 0;
+      a->time = 0;
       a->app_yes = NULL;
       a->app_no = NULL;
       admin_open = qtrue;
@@ -2270,7 +2311,7 @@ if( G_SayArgc() > 3 + skiparg ) {
   {
     if( !Q_stricmp( g_admin_admins[ i ]->guid, guid ) )
     {
-      g_admin_admins[ i ]->level = l;
+      g_admin_admins[ i ]->real_level = g_admin_admins[ i ]->level = l;
       Q_strncpyz( g_admin_admins[ i ]->name, adminname,
                   sizeof( g_admin_admins[ i ]->name ) );
       updated = qtrue;
@@ -2284,7 +2325,7 @@ if( G_SayArgc() > 3 + skiparg ) {
       return qfalse;
     }
     a = G_Alloc( sizeof( g_admin_admin_t ) );
-    a->level = l;
+    a->real_level = a->level = l;
     Q_strncpyz( a->name, adminname, sizeof( a->name ) );
     Q_strncpyz( a->guid, guid, sizeof( a->guid ) );
     *a->flags = '\0';
@@ -2550,11 +2591,6 @@ qboolean G_admin_flag( gentity_t *ent, int skiparg )
 	 G_SayArgv( 1 + skiparg, name, sizeof( name ) );
 	 if( name[ 0 ] == '*' )
 	 {
-			 if( ent )
-			 {
-					 ADMP( va( "^3!%s: only console can change admin level flags\n", cmd ) );
-					 return qfalse;
-			 }
 			 id = atoi( name + 1 );
 			 for( i = 0; i < MAX_ADMIN_LEVELS && g_admin_levels[ i ]; i++ )
 			 {
@@ -2611,6 +2647,15 @@ qboolean G_admin_flag( gentity_t *ent, int skiparg )
 					 cmd, level, flag ) );
 
 			 return qtrue;
+	 }
+
+	 if( name[ 0 ] == '*' )
+	 {
+			 if( ent )
+			 {
+					 ADMP( va( "^3!%s: only console can change admin level flags\n", cmd ) );
+					 return qfalse;
+			 }
 	 }
 
 	 G_SayArgv( 2 + skiparg, flagbuf, sizeof( flagbuf ) );
@@ -4340,6 +4385,8 @@ qboolean G_admin_mute( gentity_t *ent, int skiparg )
   char name[ MAX_NAME_LENGTH ], err[ MAX_STRING_CHARS ];
   char command[ MAX_ADMIN_CMD_LEN ], *cmd;
   gentity_t *vic;
+  mute_t new;
+  char *desc;
 
   G_SayArgv( skiparg, command, sizeof( command ) );
   cmd = command;
@@ -4364,32 +4411,27 @@ qboolean G_admin_mute( gentity_t *ent, int skiparg )
     return qfalse;
   }
   vic = &g_entities[ pids[ 0 ] ];
-  if( vic->client->pers.muted == qtrue )
-  {
-    if( !Q_stricmp( cmd, "mute" ) )
-    {
-      ADMP( "^3!mute: ^7player is already muted\n" );
-      return qtrue;
-    }
-    vic->client->pers.muted = qfalse;
-    CPx( pids[ 0 ], "cp \"^1You have been unmuted\"" );
-    AP( va( "print \"^3!unmute: ^7%s^7 has been unmuted by %s\n\"",
-            vic->client->pers.netname,
-            ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
+  new = MUTE_NONE;
+  desc = "unmuted";
+  if( !Q_stricmp( cmd, "softmute" ) ) {
+    new = MUTE_SOFT;
+    desc = "soft muted";
   }
-  else
-  {
-    if( !Q_stricmp( cmd, "unmute" ) )
-    {
-      ADMP( "^3!unmute: ^7player is not currently muted\n" );
-      return qtrue;
-    }
-    vic->client->pers.muted = qtrue;
-    CPx( pids[ 0 ], "cp \"^1You've been muted\"" );
-    AP( va( "print \"^3!mute: ^7%s^7 has been muted by ^7%s\n\"",
-            vic->client->pers.netname,
-            ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
+  if( !Q_stricmp( cmd, "mute" ) ) {
+    new = MUTE_HARD;
+    desc = "hard muted";
   }
+  if( vic->client->pers.muted == new ) {
+    ADMP( va( "^3!%s: ^7players is already %s\n", cmd, desc ) );
+    return qfalse;
+  }
+  ent->client->pers.floodDemerits = 0;
+  ent->client->pers.lastFloodTime = level.time - 100000;
+  vic->client->pers.muted = new;
+  CPx( pids[ 0 ], va( "cp \"^1You have been %s\"", desc) );
+  AP( va( "print \"^3!%s: ^7%s^7 has been %s by %s\n\"", cmd,
+          vic->client->pers.netname, desc,
+          ( ent ) ? G_admin_adminPrintName( ent ) : "console" ) );
   return qtrue;
 }
 
@@ -4922,7 +4964,7 @@ qboolean G_admin_listplayers( gentity_t *ent, int skiparg )
     guid_stub[ j ] = '\0';
 
     muted[ 0 ] = '\0';
-    if( p->pers.muted )
+    if( p->pers.muted != MUTE_NONE )
     {
       Q_strncpyz( muted, "M", sizeof( muted ) );
     }
@@ -5843,7 +5885,7 @@ qboolean G_admin_register(gentity_t *ent, int skiparg ){
 
   if( !ent ) return qtrue;
 
-  level = G_admin_level(ent);
+  level = G_admin_real_level(ent);
 
   if( level == 0 )
    level = 1;
@@ -8056,4 +8098,64 @@ qboolean G_admin_appvote( gentity_t *ent, int skiparg )
 usage:
   ADMP( "^3!appvote: ^7usage: !appvote [^3no/x/yes^7] (^5app# default=you^7) (^5more app#s ...^7)\n" );
   return qfalse;
+}
+
+int compare_time( const void *A, const void *B ) {
+  int a = *(int*)A;
+  int b = *(int*)B;
+  int aa = g_admin_admins[ a ] ? g_admin_admins[ a ]->time : 0;
+  int bb = g_admin_admins[ b ] ? g_admin_admins[ b ]->time : 0;
+  return bb - aa;
+}
+
+void G_admin_time_update( ) {
+  float f = 0.99999919774664059; // 10 day half-life
+  int i, j;
+  static int LastTime = 0;
+  static int LastTime2 = 0;
+  int admins[ MAX_ADMIN_ADMINS ];
+  int give = 0 * 3 + 1;
+
+
+  if( level.time - LastTime < 1000 ) return;
+  LastTime = level.time;
+
+  for( i = 0; i < MAX_ADMIN_ADMINS && g_admin_admins[ i ]; i++ ) {
+    g_admin_admins[ i ]->time *= f;
+  }
+  for( i = 0; i < MAX_CLIENTS; i++ ) {
+    if( level.clients[i].pers.connected != CON_CONNECTED ) continue;
+    if( level.clients[i].pers.teamSelection == PTE_NONE ) continue;
+    if( level.clients[i].pers.classSelection == PCL_NONE ) continue;
+    if( level.clients[i].lastActivityTime < level.time - 5000 ) continue;
+    j = G_admin_get_admin_index_from_guid( level.clients[i].pers.guid );
+    if( j < 0 ) continue;
+    g_admin_admins[ j ]->time += 2000000000 * (1 - f);
+  }
+
+  if( level.time - LastTime2 > 15000 )
+  {
+    LastTime2 = level.time;
+    admin_writeconfig();
+  }
+return;
+  for( i = 0; i < MAX_ADMIN_ADMINS; i++ )
+    admins[ i ] = i;
+  qsort( admins, sizeof( admins ) / sizeof( admins[0] ), sizeof( admins[0] ), compare_time );
+  for( i = 0; i < MAX_ADMIN_ADMINS; i++ ) {
+    int old;
+    j = admins[ i ];
+    if( !g_admin_admins[j] ) continue;
+    old = g_admin_admins[j]->level;
+    if( g_admin_admins[j]->real_level < give / 3 ) {
+      g_admin_admins[j]->level = give / 3;
+      give--;
+    } else {
+      g_admin_admins[j]->level = g_admin_admins[j]->real_level;
+    }
+    if( g_admin_admins[j]->level != old )
+      AP( va(
+        "print \"^3!setlevel: ^7%s^7 was given level %d admin rights by the timekeeper\n\"",
+        g_admin_admins[j]->name, g_admin_admins[j]->level ) );
+  }
 }

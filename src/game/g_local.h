@@ -369,6 +369,12 @@ typedef struct
   long timeLastViewed;
 } statsCounters_level;
 
+typedef enum {
+  MUTE_NONE,
+  MUTE_SOFT,
+  MUTE_HARD
+} mute_t;
+
 // client data that stays across multiple respawns, but is cleared
 // on each level change or team change at ClientBegin()
 typedef struct
@@ -416,7 +422,7 @@ typedef struct
   qboolean            paused;
   qboolean            saved;
   qboolean            specd;
-  qboolean            muted;
+  mute_t              muted;
   qboolean            ignoreAdminWarnings;
   qboolean            denyBuild;
   qboolean            override;
@@ -542,6 +548,7 @@ struct gclient_s
   
   int               tkcredits[ MAX_CLIENTS ];
 
+  int                 lastActivityTime;
 };
 
 
@@ -680,6 +687,7 @@ typedef struct
   int               voteYes;
   int               voteNo;
   int               numVotingClients;             // set by CalculateRanks
+  qboolean          voteSpectatorsAllowed;
 
   // team voting state
   char              teamVoteString[ 2 ][ MAX_STRING_CHARS ];
@@ -800,6 +808,10 @@ typedef struct
   statsCounters_level humanStatsCounters;
   
   int               numFreeSlots;
+
+  gentity_t         *requestingPlayer[ 2 ];
+  int               requestingAmount[ 2 ];
+  char              requestingReason[ 2 ][ MAX_STRING_CHARS ];
 } level_locals_t;
 
 #define CMD_CHEAT         0x01
@@ -1438,6 +1450,7 @@ extern  vmCvar_t  g_vampireDeathVotePercent;
 extern  vmCvar_t  g_vampireDeathInfo;
 
 extern  vmCvar_t  g_fueledjetpack;
+extern  vmCvar_t  g_jetjump;
 
 extern  vmCvar_t  g_keepSpawn;
 extern  vmCvar_t  g_keepSpawnX;
@@ -1497,3 +1510,6 @@ qboolean  trap_GetEntityToken( char *buffer, int bufferSize );
 
 void      trap_SnapVector( float *v );
 void      trap_SendGameStat( const char *data );
+void G_UpdateRequests( );
+void FixClients( );
+void FixConfigString( int num );

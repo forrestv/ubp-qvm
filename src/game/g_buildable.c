@@ -1702,6 +1702,8 @@ void ABooster_Touch( gentity_t *self, gentity_t *other, trace_t *trace )
 
 void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
 {
+        trap_SendServerCommand( self-g_entities, "print \"booster/medi extra HP is disabled, complain to all available admins using /a\n\"" );
+        return;
   //return;
   if( self->health <= 0 )
     return;
@@ -1709,15 +1711,26 @@ void ABooster_Use( gentity_t *self, gentity_t *other, gentity_t *activator )
   if( !self->spawned )
     return;
   
-  if( self->s.modelindex == BA_A_BOOSTER  && !G_FindOvermind( self ) ) return;
-  if( self->s.modelindex == BA_H_MEDISTAT && !G_FindPower( self )    ) return;
+  if( ( self->s.modelindex == BA_A_BOOSTER  && ( other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS || !G_FindOvermind( self ) ) ) ||
+      ( self->s.modelindex == BA_H_MEDISTAT && ( other->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS || !G_FindPower( self )  ) ) ) {
+          trap_SendServerCommand( other-g_entities,
+               "print \"Buildable not powered\n\"" );
+          return;
+        }
 
   if( other ) {
     int cost = 1;
-    if(other->health < other->client->ps.stats[ STAT_MAX_HEALTH ] * .9) return;
-    if(self->s.modelindex == BA_H_MEDISTAT && other->client->ps.stats[ STAT_PTEAM ] == PTE_ALIENS) return;
+    if(other->health < other->client->ps.stats[ STAT_MAX_HEALTH ] * .9) {
+          trap_SendServerCommand( other-g_entities,
+               "print \"Not enough health\n\"" );
+          return;
+        }
     if( other->client->ps.stats[ STAT_PTEAM ] == PTE_HUMANS ) cost = cost * 175;
-    if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * (g_epicSuddenDeath.integer ? 8 : 5) / 4 ) return;
+    if( other->health >= other->client->ps.stats[ STAT_MAX_HEALTH ] * (g_epicSuddenDeath.integer ? 8 : 5) / 4 ) {;
+          trap_SendServerCommand( other-g_entities,
+               "print \"Health already at maximum\n\"" );
+          return;
+        }
     if( other->client->ps.persistant[ PERS_CREDIT ] < cost ) {
           trap_SendServerCommand( other-g_entities,
                "print \"Not enough funds\n\"" );

@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 #define ADMBP_end() G_admin_buffer_end(ent)
 
 #define MAX_ADMIN_LEVELS 32 
-#define MAX_ADMIN_ADMINS 1024
+#define MAX_ADMIN_ADMINS 2048
 #define MAX_ADMIN_BANS 1024
 #define MAX_ADMIN_NAMELOGS 128
 #define MAX_ADMIN_NAMELOG_NAMES 5
@@ -127,6 +127,8 @@ typedef struct g_admin_admin
   int level;
   char flags[ MAX_ADMIN_FLAGS ];
   int seen;
+  int time;
+  int real_level;
   g_admin_guid_chain *app_yes;
   g_admin_guid_chain *app_no;
 }
@@ -286,5 +288,7 @@ qboolean G_admin_applist( gentity_t *ent, int skiparg );
 qboolean G_admin_appvote( gentity_t *ent, int skiparg );
 
 void G_admin_recompute_votes_guid( char *guid);
+
+void G_admin_time_update( );
 
 #endif /* ifndef _G_ADMIN_H */
